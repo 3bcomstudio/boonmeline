@@ -1,0 +1,38 @@
+# (ไม่บังคับ) ส่งโค้ด gas/ ขึ้น Apps Script และอัปเดต Web App เดิม (URL ไม่เปลี่ยน)
+# ต้องตั้ง Secrets ใน GitHub: CLASPRC_JSON, SCRIPT_ID, DEPLOYMENT_ID — ดูวิธีใน README หัวข้อ "อัปเดต Apps Script จาก GitHub"
+name: Deploy Apps Script (clasp)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['gas/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        id: check
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then echo "ยังไม่ได้ตั้ง CLASPRC_JSON — ข้ามขั้นตอนนี้"; echo "skip=1" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != '1'
+        with:
+          node-version: 20
+      - name: Push & deploy
+        if: steps.check.outputs.skip != '1'
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+        run: |
+          npm install -g @google/clasp@2.4.2
+          echo "$CLASPRC_JSON" > ~/.clasprc.json
+          cd gas
+          echo "{\"scriptId\":\"$SCRIPT_ID\",\"rootDir\":\".\"}" > .clasp.json
+          clasp push --force
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7}"
