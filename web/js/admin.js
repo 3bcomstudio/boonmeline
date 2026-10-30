@@ -41,7 +41,7 @@
   function render() {
     root.innerHTML =
       (R.DEMO ? '<div class="demo-banner"><span>โหมดทดลอง: ปุ่มส่ง LINE จะไม่ส่งจริง</span><span><a href="index.html">เปิดหน้าลูกค้า</a></span></div>' : '') +
-      '<header class="adm-top"><div class="adm-brand"><img src="assets/icon.svg" alt="">' + esc(A.settings.SHOP_NAME || 'ร้านข้าว') + ' <small>หลังร้าน</small></div>' +
+      '<header class="adm-top"><div class="adm-brand"><img src="assets/logo-96.png" alt="">' + esc(A.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่') + ' <small>หลังร้าน</small></div>' +
       '<span class="updated" id="updated"></span>' +
       '<div class="adm-tools">' +
       '<button type="button" class="tbtn" data-act="refresh">' + icon('refresh') + 'รีเฟรช</button>' +
@@ -409,7 +409,7 @@
       }
     }
     knownNew = newIds;
-    document.title = (newIds.length ? '(' + newIds.length + ') ' : '') + 'หลังร้าน — ' + (A.settings.SHOP_NAME || 'ร้านข้าว');
+    document.title = (newIds.length ? '(' + newIds.length + ') ' : '') + 'หลังร้าน — ' + (A.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่');
   }
 
   async function refresh(manual) {

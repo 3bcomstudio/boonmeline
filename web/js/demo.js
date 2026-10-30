@@ -30,9 +30,9 @@
   }));
 
   const SETTINGS = {
-    SHOP_NAME: 'ร้านข้าวหอม', SHOP_PHONE: '0812345678', SHOP_ADDRESS: '123 ถ.เพชรเกษม อ.หาดใหญ่ จ.สงขลา',
+    SHOP_NAME: 'หจก.บุญมีหาดใหญ่', LOGO_URL: 'assets/logo.png', SHOP_PHONE: '0812345678', SHOP_ADDRESS: '123 ถ.เพชรเกษม อ.หาดใหญ่ จ.สงขลา',
     SHOP_HOURS: 'ทุกวัน 08:00–18:00', SHOP_LAT: 7.0086, SHOP_LNG: 100.4747,
-    QUOTE_TIME: 'ภายใน 1 ชั่วโมงในเวลาทำการ', PROMPTPAY_ID: '0812345678', PROMPTPAY_NAME: 'ร้านข้าวหอม (ตัวอย่าง)',
+    QUOTE_TIME: 'ภายใน 1 ชั่วโมงในเวลาทำการ', PROMPTPAY_ID: '0812345678', PROMPTPAY_NAME: 'หจก.บุญมีหาดใหญ่ (ตัวอย่าง)',
     BANK_INFO: 'หรือโอนเข้า ธ.กสิกรไทย 012-3-45678-9 (บัญชีตัวอย่าง)', ALLOW_COD: 'TRUE',
     SHIP_BASE: 30, SHIP_PER_KM: 5, FREE_SHIP_BAGS: 10, ADMIN_NOTIFY: 'TRUE',
   };

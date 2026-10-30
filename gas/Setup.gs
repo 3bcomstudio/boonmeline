@@ -6,7 +6,8 @@
  */
 
 const DEFAULT_SETTINGS = [
-  ['SHOP_NAME', 'ร้านข้าวหอม', 'ชื่อร้าน แสดงบนหน้าเว็บและข้อความ LINE'],
+  ['SHOP_NAME', 'หจก.บุญมีหาดใหญ่', 'ชื่อร้าน แสดงบนหน้าเว็บและข้อความ LINE'],
+  ['LOGO_URL', 'https://3bcomstudio.github.io/boonmeline/assets/logo.png', 'ลิงก์รูปโลโก้ร้าน (https) แสดงในข้อความต้อนรับใน LINE — เว้นว่างถ้าไม่ต้องการ'],
   ['SHOP_PHONE', '0812345678', 'เบอร์โทรร้าน (ปุ่ม "โทรหาร้าน")'],
   ['SHOP_ADDRESS', '', 'ที่อยู่ร้าน สำหรับลูกค้าที่มารับเอง'],
   ['SHOP_HOURS', 'ทุกวัน 08:00–18:00', 'เวลาทำการ'],
@@ -42,7 +43,7 @@ function setup() {
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     const id = props.getProperty('SPREADSHEET_ID');
-    ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('ระบบสั่งข้าวสาร LINE OA');
+    ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('ระบบสั่งข้าว หจก.บุญมีหาดใหญ่');
   }
   props.setProperty('SPREADSHEET_ID', ss.getId());
   SS_CACHE_ = ss;
@@ -85,7 +86,7 @@ function ensureSheet_(ss, name, cols) {
   const missing = cols.filter(function (c) { return current.indexOf(c) < 0; });
   if (missing.length) sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
   const width = sh.getLastColumn();
-  sh.getRange(1, 1, 1, width).setFontWeight('bold').setBackground('#1B3A7A').setFontColor('#FFFFFF');
+  sh.getRange(1, 1, 1, width).setFontWeight('bold').setBackground('#12672F').setFontColor('#FFFFFF');
   sh.setFrozenRows(1);
   if (name === 'Orders') sh.setFrozenColumns(1);
 }

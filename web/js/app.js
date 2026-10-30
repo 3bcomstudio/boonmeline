@@ -32,7 +32,7 @@
   const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
   window.addEventListener('hashchange', render);
 
-  const shopName = () => S.settings.SHOP_NAME || 'สั่งข้าวสาร';
+  const shopName = () => S.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่';
   const telLink = () => 'tel:' + String(S.settings.SHOP_PHONE || '').replace(/[^\d+]/g, '');
   const productById = (id) => S.products.find((p) => p.id === id);
 
@@ -88,7 +88,7 @@
   function shell(v) {
     return (R.DEMO ? demoBanner() : '') +
       '<header class="topbar">' +
-      (v.back ? '<button type="button" class="topbar-btn" data-act="go" data-to="' + v.back + '">' + icon('back') + '<span>ย้อนกลับ</span></button>' : '') +
+      (v.back ? '<button type="button" class="topbar-btn" data-act="go" data-to="' + v.back + '">' + icon('back') + '<span>ย้อนกลับ</span></button>' : '<img class="topbar-logo" src="assets/logo-96.png" alt="">') +
       '<div class="topbar-title">' + esc(v.top || shopName()) + '</div>' +
       '<button type="button" class="topbar-btn size-btn" data-act="size" aria-label="ปรับขนาดตัวอักษร"><small>ก</small><b>ก</b></button>' +
       '</header>' +
@@ -132,7 +132,7 @@
       const o = pending[0];
       const st = R.statusInfo(o);
       alert = '<button type="button" class="alert-card" data-act="go" data-to="#/order/' + esc(o.orderId) + '">' + icon(st.icon) +
-        '<strong class="ac-text">' + (pending.length > 1 ? 'มีคำสั่งซื้อรอคุณ ' + pending.length + ' รายการ' : esc(st.label)) + '</strong>' +
+        '<strong class="ac-text">' + (pending.length > 1 ? 'มีรายการรอคุณกด ' + pending.length + ' รายการ' : esc(st.label)) + '</strong>' +
         '<span class="ac-sub">' + esc(st.next) + (o.total ? ' (฿' + money(o.total) + ')' : '') + '</span></button>';
     }
 
@@ -145,12 +145,14 @@
 
     return {
       body:
+        '<div class="brand-hero"><img src="assets/logo.png" alt="โลโก้ ' + esc(shopName()) + '" width="160" height="160">' +
+        '<div><strong>' + esc(shopName()) + '</strong><span>ร้านข้าวสาร สั่งง่ายผ่าน LINE</span></div></div>' +
         '<div class="hello"><small>สวัสดีค่ะ</small><strong>คุณ' + esc(first) + '</strong></div>' + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
         '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">เลือกข้าว บอกจำนวน แล้วร้านคิดราคาให้</span></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
-        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'คำสั่งซื้อของฉัน', sub: active ? 'กำลังดำเนินการ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่ง', badge: pending.length }) +
+        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ข้าวที่สั่งไว้', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูข้าวที่เคยสั่ง และติดตามว่าถึงไหนแล้ว', badge: pending.length }) +
         menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่ส่งข้าว' }) +
         (S.settings.SHOP_PHONE ? '<a class="menu-item call" href="' + telLink() + '"><span class="mi-ic">' + icon('phone') + '</span>' +
           '<span class="mi-text"><strong>โทรหาร้าน</strong><span class="mi-sub">' + esc(R.phoneFmt(S.settings.SHOP_PHONE)) + (S.settings.SHOP_HOURS ? ' (' + esc(S.settings.SHOP_HOURS) + ')' : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
@@ -166,7 +168,7 @@
     return '<button type="button" class="menu-item" data-act="' + o.act + '"' + (o.to ? ' data-to="' + o.to + '"' : '') + (o.id ? ' data-id="' + esc(o.id) + '"' : '') + '>' +
       '<span class="mi-ic">' + icon(o.icon) + '</span>' +
       '<span class="mi-text"><strong>' + esc(o.label) + '</strong><span class="mi-sub">' + esc(o.sub) + '</span></span>' +
-      (o.badge ? '<span class="count-badge" aria-label="รอดำเนินการ ' + o.badge + ' รายการ">' + o.badge + '</span>' : icon('chevron')) + '</button>';
+      (o.badge ? '<span class="count-badge" aria-label="รอคุณกด ' + o.badge + ' รายการ">' + o.badge + '</span>' : icon('chevron')) + '</button>';
   }
 
   /* ---------- ขั้นที่ 1: เลือกข้าว ---------- */
@@ -201,7 +203,7 @@
     const s = cartSummary();
     return s.count
       ? '<div class="actionbar-sum"><span>เลือกแล้ว</span><b>' + esc(s.text) + ' (' + s.kg + ' กก.)</b></div>' +
-        '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="go" data-to="#/purpose">ถัดไป ' + icon('chevron') + '</button>'
+        '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="go" data-to="#/purpose">ไปขั้นต่อไป ' + icon('chevron') + '</button>'
       : '<button type="button" class="btn btn-primary btn-lg btn-block" disabled>เลือกข้าวอย่างน้อย 1 อย่าง</button>';
   }
 
@@ -248,7 +250,7 @@
       back: '#/shop', top: 'สั่งข้าวสาร',
       body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'ร้านจะคิดราคาให้เหมาะกับการใช้งานของคุณ') +
         '<div class="tiles">' + tiles + '</div><div id="purpose-note">' + purposeNoteField() + '</div>',
-      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ถัดไป ' + icon('chevron') + '</button>',
+      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ไปขั้นต่อไป ' + icon('chevron') + '</button>',
     };
   };
 
@@ -298,7 +300,7 @@
         chip('asap', 'เร็วที่สุด') + chip('tomorrow', 'พรุ่งนี้') + chip('date', 'เลือกวัน') + '</div>' +
         (cart.wantMode === 'date' ? '<label class="field" style="margin-top:.8rem"><span class="sr-only">วันที่ต้องการ</span><input type="date" class="input" data-bind="wantDate" min="' + minDate + '" value="' + esc(cart.wantDate) + '"></label>' : '') +
         '</section>',
-      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="delivery-next">ถัดไป ' + icon('chevron') + '</button>',
+      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="delivery-next">ไปขั้นต่อไป ' + icon('chevron') + '</button>',
     };
   };
 
@@ -341,7 +343,7 @@
         '</div>' +
         '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่กรอกก็ได้)</span>' +
         '<textarea class="textarea" data-bind="note" rows="2" maxlength="500" placeholder="เช่น ส่งช่วงเช้า หรือ โทรก่อนมาส่ง">' + esc(cart.note) + '</textarea></label>',
-      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งคำสั่งซื้อ</button>',
+      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งข้าวให้ร้าน</button>',
     };
   };
 
@@ -356,7 +358,7 @@
       deliveryMethod: cart.deliveryMethod, address: cart.address, lat: cart.lat, lng: cart.lng,
       wantDate: wantText(), note: cart.note,
     };
-    R.busy(true, 'กำลังส่งคำสั่งซื้อ...');
+    R.busy(true, 'กำลังส่งใบสั่งข้าว...');
     try {
       const o = await R.api('createOrder', { order: payload });
       S.orders.unshift(o);
@@ -377,13 +379,13 @@
     return {
       top: shopName(),
       body: '<div class="done-hero"><div class="big-check">' + icon('check') + '</div>' +
-        '<h1 class="page-title">ส่งคำสั่งซื้อแล้ว</h1>' +
+        '<h1 class="page-title">ส่งใบสั่งข้าวให้ร้านแล้ว</h1>' +
         '<div class="order-no">เลขที่ ' + esc(id) + '</div>' +
         '<p>ร้านกำลังคิดราคา แล้วจะส่งราคามาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
         '<p style="margin-top:.5rem">ตอนนี้ไม่ต้องทำอะไรเพิ่ม รอข้อความจากร้านได้เลยค่ะ</p></div>' +
         '<div class="stack">' +
         (R.inLineApp() ? '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="close">' + icon('chat') + ' กลับไปที่แชท LINE</button>' : '') +
-        '<button type="button" class="btn btn-ghost btn-lg btn-block" data-act="go" data-to="#/order/' + esc(id) + '">ดูคำสั่งซื้อนี้</button>' +
+        '<button type="button" class="btn btn-ghost btn-lg btn-block" data-act="go" data-to="#/order/' + esc(id) + '">ดูใบสั่งข้าวนี้</button>' +
         '<button type="button" class="btn btn-quiet btn-block" data-act="go" data-to="#/">กลับหน้าแรก</button></div>',
     };
   };
@@ -393,11 +395,11 @@
   VIEWS.orders = function () {
     const list = S.orders.length
       ? '<div class="order-list">' + S.orders.map(orderCard).join('') + '</div>'
-      : '<div class="empty">' + icon('receipt') + '<p>ยังไม่มีคำสั่งซื้อ</p>' +
+      : '<div class="empty">' + icon('receipt') + '<p>ยังไม่เคยสั่งข้าว</p>' +
         '<button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" data-act="go" data-to="#/shop">สั่งข้าวสาร</button></div>';
     return {
-      back: '#/', top: 'คำสั่งซื้อของฉัน',
-      body: '<h1 class="page-title" style="margin-bottom:.9rem">คำสั่งซื้อของฉัน</h1>' + list,
+      back: '#/', top: 'ข้าวที่สั่งไว้',
+      body: '<h1 class="page-title" style="margin-bottom:.9rem">ข้าวที่สั่งไว้</h1>' + list,
     };
   };
 
@@ -418,7 +420,7 @@
     const o = S.orders.find((x) => x.orderId === id);
     if (!o) {
       loadOrder(id);
-      return { back: '#/orders', top: 'คำสั่งซื้อ', body: '<div class="splash" style="min-height:40vh"><div><span class="spinner"></span><p>กำลังเปิดคำสั่งซื้อ...</p></div></div>' };
+      return { back: '#/orders', top: 'ใบสั่งข้าว', body: '<div class="splash" style="min-height:40vh"><div><span class="spinner"></span><p>กำลังเปิดใบสั่งข้าว...</p></div></div>' };
     }
     const st = R.statusInfo(o);
     const s = S.settings;
@@ -429,11 +431,11 @@
       if (!payChoice[o.orderId] && !allowCod) payChoice[o.orderId] = 'transfer';
       const pick = payChoice[o.orderId] || '';
       action = '<section class="section"><h2 class="section-title">เลือกวิธีจ่ายเงิน</h2><div class="tiles one">' +
-        tile({ act: 'pay', id: 'transfer', icon: 'qr', label: 'สแกนจ่าย / โอนเงิน', sub: 'ใช้แอปธนาคาร แล้วส่งรูปสลิป', on: pick === 'transfer' }) +
+        tile({ act: 'pay', id: 'transfer', icon: 'qr', label: 'โอนเงิน / สแกน QR', sub: 'ใช้แอปธนาคาร แล้วส่งรูปสลิป', on: pick === 'transfer' }) +
         (allowCod ? tile({ act: 'pay', id: 'cod', icon: 'cash', label: o.deliveryMethod === 'pickup' ? 'จ่ายเงินสดตอนมารับ' : 'จ่ายเงินสดตอนรับข้าว', sub: o.deliveryMethod === 'pickup' ? 'จ่ายที่ร้าน' : 'จ่ายให้คนส่งข้าว', on: pick === 'cod' }) : '') +
         '</div></section>';
       bar = '<button type="button" class="btn btn-go btn-lg btn-block" data-act="confirm" data-id="' + esc(o.orderId) + '"' + (pick ? '' : ' disabled') + '>' +
-        (pick ? icon('check') + ' ยืนยันสั่งซื้อ ฿' + money(o.total) : 'เลือกวิธีจ่ายเงินก่อน') + '</button>';
+        (pick ? icon('check') + ' ยืนยันสั่งข้าว ฿' + money(o.total) : 'เลือกวิธีจ่ายเงินก่อน') + '</button>';
     } else if (o.status === 'confirmed' && o.payMethod !== 'cod') {
       action = payPanel(o);
       bar = slipButton(o, 'ส่งรูปสลิป');
@@ -446,16 +448,16 @@
 
     const canCancel = ['new', 'quoted', 'confirmed'].indexOf(o.status) >= 0;
     return {
-      back: '#/orders', top: 'คำสั่งซื้อ #' + o.orderId,
+      back: '#/orders', top: 'ใบสั่งข้าว #' + o.orderId,
       body:
-        '<h1 class="page-title">คำสั่งซื้อ #' + esc(o.orderId) + '</h1>' +
+        '<h1 class="page-title">ใบสั่งข้าว #' + esc(o.orderId) + '</h1>' +
         '<p class="page-lead" style="margin-bottom:.9rem">สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + '</p>' +
         '<div class="status-box tone-' + st.tone + '">' + icon(st.icon) + '<strong>' + esc(st.label) + '</strong><span>' + esc(st.next) + '</span></div>' +
         billHtml(o, st) + action +
         (o.status !== 'cancelled' ? '<section class="section"><h2 class="section-title">ขั้นตอน</h2>' + timeline(o) + '</section>' : '') +
         '<div class="stack section">' +
         (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' โทรถามร้าน ' + esc(R.phoneFmt(s.SHOP_PHONE)) + '</a>' : '') +
-        (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกคำสั่งซื้อนี้</button>' : '') +
+        (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกการสั่งข้าวนี้</button>' : '') +
         '</div>',
       bar: bar,
     };
@@ -503,7 +505,7 @@
     const steps = [
       { t: 'สั่งข้าว', d: o.createdAt },
       { t: 'ร้านแจ้งราคา', d: o.quotedAt },
-      { t: cod ? 'ยืนยันสั่งซื้อ (จ่ายเงินสด)' : 'จ่ายเงิน', d: cod ? o.confirmedAt : o.paidAt },
+      { t: cod ? 'ยืนยันสั่งข้าว (จ่ายเงินสด)' : 'จ่ายเงิน', d: cod ? o.confirmedAt : o.paidAt },
       { t: pickup ? 'ข้าวพร้อมให้มารับ' : 'ร้านนำข้าวไปส่ง', d: o.shippedAt },
       { t: 'ได้รับข้าว', d: o.doneAt },
     ];
@@ -565,7 +567,7 @@
       const u = await R.api('confirmOrder', { orderId: id, payMethod: pay });
       upsertOrder(u);
       R.sendChat('ยืนยันสั่งซื้อ #' + id + ' ยอด ฿' + money(u.total) + ' (' + payText + ')');
-      R.toast('ยืนยันสั่งซื้อแล้ว', 'ok');
+      R.toast('ยืนยันสั่งข้าวแล้ว', 'ok');
       render();
       window.scrollTo(0, 0);
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
@@ -596,12 +598,12 @@
   }
 
   async function cancelOrder(id) {
-    const ok = await R.confirmBox('ยกเลิกคำสั่งซื้อนี้ใช่ไหมคะ', 'ถ้ายกเลิกแล้ว ต้องสั่งใหม่อีกครั้ง', 'ใช่ ยกเลิก', 'ไม่ยกเลิก', 'danger');
+    const ok = await R.confirmBox('ยกเลิกการสั่งข้าวนี้ใช่ไหมคะ', 'ถ้ายกเลิกแล้ว ต้องสั่งใหม่อีกครั้ง', 'ใช่ ยกเลิก', 'ไม่ยกเลิก', 'danger');
     if (!ok) return;
     R.busy(true, 'กำลังยกเลิก...');
     try {
       upsertOrder(await R.api('cancelOrder', { orderId: id }));
-      R.toast('ยกเลิกคำสั่งซื้อแล้ว', 'ok');
+      R.toast('ยกเลิกการสั่งข้าวแล้ว', 'ok');
       render();
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
@@ -749,7 +751,7 @@
         break;
       case 'save-profile': saveProfile(id === 'new'); break;
       case 'demo-reset':
-        if (await R.confirmBox('ล้างข้อมูลทดลอง?', 'คำสั่งซื้อและข้อมูลทดลองในเครื่องนี้จะถูกลบ', 'ล้างข้อมูล', 'ยกเลิก', 'danger')) {
+        if (await R.confirmBox('ล้างข้อมูลทดลอง?', 'ข้าวที่สั่งและข้อมูลทดลองในเครื่องนี้จะถูกลบ', 'ล้างข้อมูล', 'ยกเลิก', 'danger')) {
           window.DemoServer.reset(); R.storage(CART_KEY, null); location.hash = ''; location.reload();
         }
         break;
@@ -787,7 +789,7 @@
   /* ---------- เริ่มต้น ---------- */
 
   function splash(text) {
-    return '<div class="splash"><div><span class="spinner" aria-hidden="true"></span><h1>' + esc(text) + '</h1></div></div>';
+    return '<div class="splash"><div><img class="splash-logo" src="assets/logo.png" alt="" width="160" height="160"><span class="spinner" aria-hidden="true"></span><h1>' + esc(text) + '</h1></div></div>';
   }
 
   async function boot() {

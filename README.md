@@ -210,3 +210,4 @@ git push -u origin main
 | ลูกค้าไม่ได้รับใบแจ้งราคา | ลูกค้ายังไม่ได้เพิ่มเพื่อน/บล็อก OA หรือ Login channel กับ Messaging API อยู่คนละ Provider — หน้าแอดมินจะแสดงข้อความ error ของ LINE |
 | แก้โค้ด Apps Script แล้วไม่เปลี่ยน | ต้อง Deploy เป็น New version |
 | ไม่มีการ์ดตอบกลับในแชทหลังสั่ง | ต้องเปิด LIFF จากในแชทกับ OA และเปิด scope `chat_message.write` |
+## 309920

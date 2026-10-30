@@ -6,8 +6,8 @@
  */
 
 const C = {
-  indigo: '#1B3A7A', ink: '#0F1E3D', ink2: '#3B4A66', ink3: '#5E6B85',
-  gold: '#E3A72F', goldDark: '#8A5A00', green: '#13703F', red: '#B3261E', line: '#D5DCE8',
+  brand: '#12672F', ink: '#142519', ink2: '#34483A', ink3: '#56685A',
+  gold: '#D9A521', goldDark: '#765000', green: '#17803D', red: '#B3261E', line: '#E3DDC8',
 };
 
 /* ---------------- Messaging API ---------------- */
@@ -90,14 +90,15 @@ function kv_(label, value, opt) {
 
 function btn_(label, uri, style, color) {
   if (!uri) return null;
-  return { type: 'button', style: style || 'primary', color: style === 'secondary' ? undefined : (color || C.indigo), height: 'md', action: { type: 'uri', label: label, uri: uri } };
+  return { type: 'button', style: style || 'primary', color: style === 'secondary' ? undefined : (color || C.brand), height: 'md', action: { type: 'uri', label: label, uri: uri } };
 }
 
 function bubble_(o) {
   const b = {
     type: 'bubble', size: 'mega',
+    hero: o.hero ? { type: 'image', url: o.hero, size: 'md', aspectRatio: '1:1', aspectMode: 'fit', backgroundColor: '#FFFFFF' } : undefined,
     header: {
-      type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: o.headerBg || C.indigo,
+      type: 'box', layout: 'vertical', paddingAll: '18px', backgroundColor: o.headerBg || C.brand,
       contents: [t_(o.title, { color: o.headerColor || '#FFFFFF', size: 'xl', weight: 'bold' })]
         .concat(o.subtitle ? [t_(o.subtitle, { color: o.subColor || '#E9EEF8', size: 'md', margin: 'xs' })] : []),
     },
@@ -107,6 +108,7 @@ function bubble_(o) {
     if (!x.color) delete x.color;
     return x;
   });
+  if (!b.hero) delete b.hero;
   if (buttons.length) b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '14px', contents: buttons };
   return b;
 }
@@ -115,7 +117,7 @@ function flex_(altText, bubble) {
   return { type: 'flex', altText: String(altText).slice(0, 380), contents: bubble };
 }
 
-function shopName_(s) { return String(s.SHOP_NAME || 'ร้านข้าวสาร'); }
+function shopName_(s) { return String(s.SHOP_NAME || 'หจก.บุญมีหาดใหญ่'); }
 
 /* ---------------- Customer messages ---------------- */
 
@@ -123,6 +125,7 @@ function flexWelcome_(s) {
   return flex_('ยินดีต้อนรับสู่ ' + shopName_(s) + ' — กดปุ่ม "สั่งข้าวสาร" เพื่อเริ่มสั่ง', bubble_({
     title: 'ยินดีต้อนรับค่ะ',
     subtitle: shopName_(s),
+    hero: /^https:\/\//.test(String(s.LOGO_URL || '')) ? String(s.LOGO_URL) : '',
     body: [
       t_('สั่งข้าวสารง่าย ๆ ใน 3 ขั้นตอน', { weight: 'bold', size: 'lg' }),
       t_('1. เลือกข้าวและจำนวนถุง', { margin: 'md' }),
@@ -138,7 +141,7 @@ function flexWelcome_(s) {
 
 function flexQuote_(o, s) {
   const q = o.quote || { lines: [], subtotal: 0, shippingFee: 0, discount: 0, total: o.total };
-  const body = [t_('รายการข้าว', { weight: 'bold', color: C.indigo })];
+  const body = [t_('รายการข้าว', { weight: 'bold', color: C.brand })];
   q.lines.forEach(function (l) {
     body.push({
       type: 'box', layout: 'vertical', margin: 'md',
@@ -157,7 +160,7 @@ function flexQuote_(o, s) {
     type: 'box', layout: 'horizontal', margin: 'lg',
     contents: [
       t_('ยอดที่ต้องจ่าย', { weight: 'bold', size: 'lg', gravity: 'center', flex: 4 }),
-      t_('฿' + money_(q.total), { weight: 'bold', size: 'xxl', color: C.indigo, align: 'end', flex: 5 }),
+      t_('฿' + money_(q.total), { weight: 'bold', size: 'xxl', color: C.brand, align: 'end', flex: 5 }),
     ],
   });
   if (q.note) body.push(t_('ข้อความจากร้าน: ' + q.note, { size: 'md', color: C.ink2, margin: 'lg' }));
@@ -165,7 +168,7 @@ function flexQuote_(o, s) {
 
   return flex_('ร้านแจ้งราคา #' + o.orderId + ' ยอด ฿' + money_(q.total) + ' — กดเพื่อยืนยัน', bubble_({
     title: 'ร้านแจ้งราคาแล้ว',
-    subtitle: 'คำสั่งซื้อ #' + o.orderId,
+    subtitle: 'ใบสั่งข้าว เลขที่ ' + o.orderId,
     body: body,
     buttons: [
       btn_('ดูราคาและยืนยัน', liffUrl_(o.orderId), 'primary', C.green),
@@ -179,27 +182,27 @@ function statusCopy_(o, s, from) {
   const pickup = o.deliveryMethod === 'pickup';
   switch (o.status) {
     case 'new':
-      return { title: 'ร้านได้รับคำสั่งซื้อแล้ว', text: 'ร้านกำลังคิดราคา แล้วจะส่งราคามาในแชทนี้' + (s.QUOTE_TIME ? ' (' + s.QUOTE_TIME + ')' : ''), bg: C.indigo, btn: 'ดูคำสั่งซื้อ' };
+      return { title: 'ร้านได้รับใบสั่งข้าวแล้ว', text: 'ร้านกำลังคิดราคา แล้วจะส่งราคามาในแชทนี้' + (s.QUOTE_TIME ? ' (' + s.QUOTE_TIME + ')' : ''), bg: C.brand, btn: 'ดูใบสั่งข้าว' };
     case 'quoted':
-      return { title: 'ร้านแจ้งราคาแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดูราคาและยืนยัน', bg: C.indigo, btn: 'ดูราคาและยืนยัน' };
+      return { title: 'ร้านแจ้งราคาแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดูราคาและยืนยัน', bg: C.brand, btn: 'ดูราคาและยืนยัน' };
     case 'confirmed':
       if (from === 'slip') return { title: 'ขอรูปสลิปใหม่อีกครั้ง', text: 'ร้านตรวจสลิปแล้วยังไม่ตรงกับยอดเงิน กรุณาส่งรูปสลิปใหม่', bg: C.red, btn: 'ส่งสลิปใหม่' };
-      if (o.payMethod === 'cod') return { title: 'ยืนยันคำสั่งซื้อแล้ว', text: 'เตรียมเงินสด ' + total + (pickup ? ' ไว้จ่ายตอนมารับข้าวที่ร้าน' : ' ไว้จ่ายตอนรับข้าว'), bg: C.indigo, btn: 'ดูคำสั่งซื้อ' };
-      return { title: 'ยืนยันคำสั่งซื้อแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดู QR พร้อมเพย์และส่งรูปสลิป', bg: C.indigo, btn: 'จ่ายเงินและส่งสลิป' };
+      if (o.payMethod === 'cod') return { title: 'ยืนยันสั่งข้าวแล้ว', text: 'เตรียมเงินสด ' + total + (pickup ? ' ไว้จ่ายตอนมารับข้าวที่ร้าน' : ' ไว้จ่ายตอนรับข้าว'), bg: C.brand, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ยืนยันสั่งข้าวแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดู QR พร้อมเพย์และส่งรูปสลิป', bg: C.brand, btn: 'จ่ายเงินและส่งสลิป' };
     case 'slip':
-      return { title: 'ร้านได้รับสลิปแล้ว', text: 'ร้านกำลังตรวจสอบยอดเงิน แล้วจะแจ้งให้ทราบในแชทนี้', bg: C.indigo, btn: 'ดูคำสั่งซื้อ' };
+      return { title: 'ร้านได้รับสลิปแล้ว', text: 'ร้านกำลังตรวจสอบยอดเงิน แล้วจะแจ้งให้ทราบในแชทนี้', bg: C.brand, btn: 'ดูใบสั่งข้าว' };
     case 'paid':
-      return { title: 'ได้รับเงินแล้ว ขอบคุณค่ะ', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูคำสั่งซื้อ' };
+      return { title: 'ได้รับเงินแล้ว ขอบคุณค่ะ', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูใบสั่งข้าว' };
     case 'shipping':
       return pickup
-        ? { title: 'ข้าวพร้อมแล้ว มารับได้เลย', text: 'มารับที่ร้าน' + (s.SHOP_ADDRESS ? ': ' + s.SHOP_ADDRESS : ''), bg: C.green, btn: 'ดูคำสั่งซื้อ' }
-        : { title: 'ข้าวกำลังไปส่ง', text: 'ร้านกำลังนำข้าวไปส่ง' + (o.payMethod === 'cod' ? ' เตรียมเงินสด ' + total + ' ไว้ด้วยนะคะ' : ''), bg: C.green, btn: 'ดูคำสั่งซื้อ' };
+        ? { title: 'ข้าวพร้อมแล้ว มารับได้เลย', text: 'มารับที่ร้าน' + (s.SHOP_ADDRESS ? ': ' + s.SHOP_ADDRESS : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' }
+        : { title: 'ข้าวกำลังไปส่ง', text: 'ร้านกำลังนำข้าวไปส่ง' + (o.payMethod === 'cod' ? ' เตรียมเงินสด ' + total + ' ไว้ด้วยนะคะ' : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' };
     case 'done':
       return { title: 'ได้รับข้าวเรียบร้อย', text: 'ขอบคุณที่อุดหนุน' + shopName_(s) + 'ค่ะ', bg: C.green, btn: 'สั่งข้าวอีกครั้ง', home: true };
     case 'cancelled':
-      return { title: 'คำสั่งซื้อถูกยกเลิก', text: o.cancelReason || 'ยกเลิกแล้ว', bg: C.red, btn: 'ดูคำสั่งซื้อ' };
+      return { title: 'ยกเลิกการสั่งข้าวแล้ว', text: o.cancelReason || 'ยกเลิกแล้ว', bg: C.red, btn: 'ดูใบสั่งข้าว' };
   }
-  return { title: STATUS_LABEL[o.status] || o.status, text: '', bg: C.indigo, btn: 'ดูคำสั่งซื้อ' };
+  return { title: STATUS_LABEL[o.status] || o.status, text: '', bg: C.brand, btn: 'ดูใบสั่งข้าว' };
 }
 
 /** ข้อความแจ้งสถานะให้ลูกค้า — opts: {from, note} */
@@ -211,10 +214,10 @@ function flexStatus_(o, s, opts) {
   if (o.itemsText) body.push(t_(o.itemsText, { size: 'sm', color: C.ink3, margin: 'lg' }));
   return flex_(c.title + ' #' + o.orderId + ' — ' + c.text, bubble_({
     title: c.title,
-    subtitle: 'คำสั่งซื้อ #' + o.orderId,
+    subtitle: 'ใบสั่งข้าว เลขที่ ' + o.orderId,
     headerBg: c.bg,
     body: body,
-    buttons: [btn_(c.btn, liffUrl_(c.home ? '' : o.orderId), 'primary', C.indigo)],
+    buttons: [btn_(c.btn, liffUrl_(c.home ? '' : o.orderId), 'primary', C.brand)],
   }));
 }
 
@@ -229,7 +232,7 @@ function flexAdminNewOrder_(o, s) {
   const body = [
     kv_('ลูกค้า', o.fullName || o.lineName, { weight: 'bold' }),
     kv_('โทร', o.phone || '-'),
-    kv_('ซื้อไป', o.purposeLabel + (o.purposeNote ? ' — ' + o.purposeNote : ''), { weight: 'bold', color: C.indigo }),
+    kv_('ซื้อไป', o.purposeLabel + (o.purposeNote ? ' — ' + o.purposeNote : ''), { weight: 'bold', color: C.brand }),
     { type: 'separator', margin: 'md', color: C.line },
     t_(o.itemsText, { margin: 'md', weight: 'bold' }),
     t_('รวม ' + o.totalBags + ' ถุง / ' + o.totalKg + ' กก.', { size: 'sm', color: C.ink3 }),
@@ -295,7 +298,7 @@ function handleWebhook_(body) {
         const list = ordersOfUser_(uid);
         reply_(ev.replyToken, [list.length
           ? flexStatus_(list[0], s)
-          : { type: 'text', text: 'ยังไม่มีคำสั่งซื้อค่ะ พิมพ์ "สั่งข้าว" เพื่อเริ่มสั่ง' }]);
+          : { type: 'text', text: 'ยังไม่เคยสั่งข้าวค่ะ พิมพ์ "สั่งข้าว" เพื่อเริ่มสั่ง' }]);
       }
       // ข้อความอื่น ๆ ปล่อยให้แอดมินตอบเองใน LINE OA Manager
     } catch (err) {

@@ -1,5 +1,5 @@
 /* base.css — โทนสี ตัวอักษร และส่วนประกอบที่ใช้ร่วมกัน (ลูกค้า + แอดมิน)
- * แนวคิด: คราม (ผ้าย้อมครามอีสาน ถิ่นข้าวหอมมะลิ) + ทองรวงข้าว บนพื้นขาวอมฟ้า
+ * แนวคิด: เขียว-ทอง ตามโลโก้ หจก.บุญมีหาดใหญ่ บนพื้นครีมสีข้าวสาร
  * ตัวอักษร Sarabun แบบมีหัว — อ่านง่ายสำหรับผู้สูงวัย คุ้นตาจากหนังสือราชการ
  */
 @font-face { font-family: 'Sarabun'; font-style: normal; font-weight: 400; font-display: swap; src: url(../fonts/sarabun-thai-400-normal.woff2) format('woff2'); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
@@ -10,22 +10,25 @@
 @font-face { font-family: 'Sarabun'; font-style: normal; font-weight: 700; font-display: swap; src: url(../fonts/sarabun-latin-700-normal.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 :root {
-  --indigo: #1B3A7A;
-  --indigo-800: #132B5C;
-  --indigo-100: #DCE4F3;
-  --indigo-50: #EEF2FA;
-  --ink: #0F1E3D;
-  --ink-2: #34425E;
-  --ink-3: #56637D;
-  --gold: #E3A72F;
-  --gold-100: #FCF0D4;
-  --gold-700: #7A4F00;
-  --page: #EDF1F7;
+  --brand: #12672F;
+  --brand-800: #0B4A21;
+  --brand-100: #D4EAD9;
+  --brand-50: #EDF6EF;
+  --ink: #142519;
+  --ink-2: #34483A;
+  --ink-3: #56685A;
+  --gold: #D9A521;
+  --gold-light: #F3D46E;
+  --gold-100: #FBF1D3;
+  --gold-700: #765000;
+  --info: #1F5C87;
+  --info-50: #E6EFF6;
+  --page: #F6F3E8;
   --surface: #FFFFFF;
-  --line: #CDD5E3;
-  --line-soft: #E3E8F1;
-  --green: #13703F;
-  --green-50: #E2F2E8;
+  --line: #D9D2BC;
+  --line-soft: #EBE6D6;
+  --green: #17803D;
+  --green-50: #E1F2E6;
   --red: #B3261E;
   --red-50: #FBE8E6;
   --r-lg: 20px;
@@ -50,7 +53,7 @@ body {
 h1, h2, h3 { line-height: 1.3; margin: 0; }
 p { margin: 0; }
 img { max-width: 100%; display: block; }
-a { color: var(--indigo); }
+a { color: var(--brand); }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
@@ -71,16 +74,16 @@ button { cursor: pointer; }
 .btn[disabled] { opacity: .45; pointer-events: none; }
 .btn-block { display: flex; width: 100%; }
 .btn-lg { min-height: 3.5rem; font-size: 1.2rem; }
-.btn-primary { background: var(--indigo); color: #fff; }
-.btn-primary:hover { background: var(--indigo-800); }
-.btn-go { background: var(--green); color: #fff; }
-.btn-go:hover { background: #0E5B33; }
-.btn-ghost { background: var(--surface); color: var(--indigo); border-color: var(--indigo); }
-.btn-ghost:hover { background: var(--indigo-50); }
-.btn-quiet { background: transparent; color: var(--indigo); border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.btn-primary { background: var(--brand); color: #fff; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18); }
+.btn-primary:hover { background: var(--brand-800); }
+.btn-go { background: linear-gradient(180deg, #1E8F46, var(--green)); color: #fff; border-color: var(--gold); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18); }
+.btn-go:hover { background: var(--brand); }
+.btn-ghost { background: var(--surface); color: var(--brand); border-color: var(--brand); }
+.btn-ghost:hover { background: var(--brand-50); }
+.btn-quiet { background: transparent; color: var(--brand); border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
 .btn-danger { background: var(--surface); color: var(--red); border-color: var(--red); }
 .btn-danger:hover { background: var(--red-50); }
-.btn-gold { background: var(--gold); color: var(--ink); }
+.btn-gold { background: linear-gradient(180deg, var(--gold-light), var(--gold)); color: var(--ink); }
 
 /* ---------- ฟอร์ม ---------- */
 .field { display: block; margin-bottom: 1.15rem; }
@@ -92,7 +95,7 @@ button { cursor: pointer; }
   font-size: 1.1rem;
 }
 .textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }
-.input:focus, .textarea:focus, .select:focus { border-color: var(--indigo); outline: none; box-shadow: 0 0 0 3px var(--indigo-100); }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-100); }
 .input.is-invalid, .textarea.is-invalid { border-color: var(--red); }
 .field-error { display: block; color: var(--red); font-weight: 600; margin-top: .3rem; }
 
@@ -103,10 +106,10 @@ button { cursor: pointer; }
   border: 1.5px solid currentColor;
 }
 .tone-gold { color: var(--gold-700); background: var(--gold-100); }
-.tone-blue { color: var(--indigo); background: var(--indigo-50); }
+.tone-blue { color: var(--info); background: var(--info-50); }
 .tone-green { color: var(--green); background: var(--green-50); }
 .tone-red { color: var(--red); background: var(--red-50); }
-.tone-done { color: var(--ink-3); background: #F1F3F7; }
+.tone-done { color: var(--ink-3); background: #F0EEE6; }
 
 /* ---------- toast ---------- */
 .toast {
@@ -116,7 +119,7 @@ button { cursor: pointer; }
   width: max-content; max-width: calc(100% - 2rem);
   padding: .8rem 1.1rem; border-radius: var(--r);
   background: var(--ink); color: #fff; font-weight: 600; font-size: 1.05rem;
-  box-shadow: 0 10px 30px rgba(15, 30, 61, .25);
+  box-shadow: 0 10px 30px rgba(20, 37, 25, .25);
   transition: transform .25s ease, opacity .25s ease;
 }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
@@ -127,7 +130,7 @@ button { cursor: pointer; }
 .modal-wrap {
   position: fixed; inset: 0; z-index: 80;
   display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(15, 30, 61, .5); opacity: 0; transition: opacity .18s;
+  background: rgba(20, 37, 25, .5); opacity: 0; transition: opacity .18s;
 }
 .modal-wrap.show { opacity: 1; }
 .modal {
@@ -149,17 +152,17 @@ button { cursor: pointer; }
 /* ---------- กำลังโหลด ---------- */
 .busy {
   position: fixed; inset: 0; z-index: 85; display: none;
-  align-items: center; justify-content: center; background: rgba(237, 241, 247, .82);
+  align-items: center; justify-content: center; background: rgba(246, 243, 232, .85);
 }
 .busy.show { display: flex; }
 .busy-box {
   display: flex; align-items: center; gap: .8rem;
   padding: 1.1rem 1.5rem; border-radius: var(--r); background: var(--surface);
-  font-weight: 700; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(15, 30, 61, .15);
+  font-weight: 700; font-size: 1.1rem; box-shadow: 0 10px 30px rgba(20, 37, 25, .15);
 }
 .spinner {
   width: 1.6rem; height: 1.6rem; border-radius: 50%;
-  border: 3px solid var(--indigo-100); border-top-color: var(--indigo);
+  border: 3px solid var(--brand-100); border-top-color: var(--brand);
   animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -167,7 +170,7 @@ button { cursor: pointer; }
 .demo-banner {
   display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
   padding: .45rem 1rem; background: var(--gold-100); color: var(--gold-700);
-  font-size: .85rem; font-weight: 600; border-bottom: 1px solid #EED9A6;
+  font-size: .85rem; font-weight: 600; border-bottom: 1px solid #EED9A0;
 }
 .demo-banner button { background: none; border: 0; color: inherit; text-decoration: underline; font-weight: 700; padding: .2rem 0; }
 
