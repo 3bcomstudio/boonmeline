@@ -6,13 +6,13 @@
  */
 window.APP_CONFIG = {
   // URL ของ Apps Script Web App (ลงท้ายด้วย /exec)
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbx0dYK9Gbz4JyN1v216pGHeRxA3kIoFNkF2eYhWHn0CZ30QOK-sinHO9rfufwUHtwUufA/exec',
 
   // LIFF ID หน้าลูกค้า (Endpoint URL = https://<github-user>.github.io/<repo>/)
-  LIFF_ID: '',
+  LIFF_ID: '2012301609-Sm6PAIYY',
 
   // LIFF ID หน้าแอดมิน (Endpoint URL = .../admin.html) — ถ้าว่างจะใช้ LIFF_ID
-  ADMIN_LIFF_ID: '',
+  ADMIN_LIFF_ID: '2012301609-L75hvPja',
 
   // ส่งข้อความสรุปเข้าแชท LINE แทนลูกค้าหลังสั่งซื้อ/ยืนยัน/ส่งสลิป
   // (บอทจะตอบกลับด้วยการ์ดสถานะ — ไม่กินโควตาข้อความ)
