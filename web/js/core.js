@@ -292,8 +292,41 @@
       el.id = 'busy'; el.className = 'busy'; el.setAttribute('role', 'alert');
       document.body.appendChild(el);
     }
-    el.innerHTML = '<div class="busy-box"><span class="spinner" aria-hidden="true"></span><span>' + esc(text || 'กำลังทำงาน...') + '</span></div>';
+    el.innerHTML = '<div class="busy-box">' + sackLoader('4.2rem') + '<span class="loading-text">' + esc(text || 'กำลังทำงาน...') + '</span></div>';
     el.classList.add('show');
+  }
+
+  /* ---------- ภาพตอนโหลด: เมล็ดข้าวร่วงลงกระสอบ (SVG + CSS ไม่ต้องโหลดไฟล์เพิ่ม) ---------- */
+  let sackSeq = 0;
+  function sackLoader(size) {
+    const id = 'sk' + (++sackSeq);
+    const body = 'M30 40C25 60 23 82 25 104C26 116 23 124 18 130C34 126 46 128 60 128S86 126 102 130C97 124 94 116 95 104C97 82 95 60 90 40Z';
+    const grains = [[50, 0, -20], [66, .32, 25], [57, .64, -5], [70, .96, 40], [46, 1.28, 10]].map((g) =>
+      '<ellipse cx="' + g[0] + '" cy="4" rx="2.6" ry="4.3" style="animation-delay:' + g[1] + 's;--r:' + g[2] + 'deg"/>').join('');
+    return '<span class="sack-loader" style="--sl:' + (size || '8rem') + '" aria-hidden="true"><svg viewBox="0 0 120 140" focusable="false">' +
+      '<defs>' +
+      '<linearGradient id="' + id + 'b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBF0D2"/><stop offset=".55" stop-color="#EBCF8D"/><stop offset="1" stop-color="#C9973B"/></linearGradient>' +
+      '<linearGradient id="' + id + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6E3AE"/><stop offset="1" stop-color="#D6AE5C"/></linearGradient>' +
+      '<linearGradient id="' + id + 's" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      '<radialGradient id="' + id + 'h"><stop offset="0" stop-color="#F3D46E" stop-opacity=".6"/><stop offset="1" stop-color="#F3D46E" stop-opacity="0"/></radialGradient>' +
+      '<pattern id="' + id + 'w" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 .5H4M.5 0V4" stroke="#A97B2C" stroke-width=".6" opacity=".22"/></pattern>' +
+      '<clipPath id="' + id + 'k"><path d="' + body + '"/></clipPath>' +
+      '</defs>' +
+      '<circle class="sl-halo" cx="60" cy="80" r="60" fill="url(#' + id + 'h)"/>' +
+      '<ellipse class="sl-shadow" cx="60" cy="131" rx="42" ry="5"/>' +
+      '<g class="sl-grains">' + grains + '</g>' +
+      '<g class="sl-sack">' +
+      '<path d="' + body + '" fill="url(#' + id + 'b)" stroke="#B88A33" stroke-width="1.5"/>' +
+      '<g clip-path="url(#' + id + 'k)">' +
+      '<rect x="0" y="0" width="120" height="140" fill="url(#' + id + 'w)"/>' +
+      '<rect x="0" y="56" width="120" height="9" fill="#12672F"/><rect x="0" y="66.5" width="120" height="1.6" fill="#D9A521"/>' +
+      '<rect class="sl-shine" x="-30" y="20" width="26" height="120" fill="url(#' + id + 's)"/></g>' +
+      '<path d="M27 118C46 123 74 123 93 118" fill="none" stroke="#B88A33" stroke-width="1.2" stroke-dasharray="3 3" opacity=".7"/>' +
+      '<text x="60" y="98" text-anchor="middle" font-size="16" font-weight="700" fill="#12672F">ข้าว</text>' +
+      '<path d="M29 30C29 23 91 23 91 30L90 42C76 37 44 37 30 42Z" fill="url(#' + id + 'c)" stroke="#B88A33" stroke-width="1.5"/>' +
+      '<ellipse cx="60" cy="30" rx="29" ry="6" fill="#7A5420"/>' +
+      '<ellipse class="sl-heap" cx="60" cy="31.5" rx="24" ry="3.8" fill="#FFF8E7"/>' +
+      '</g></svg></span>';
   }
 
   /* ---------- PromptPay QR (มาตรฐาน EMVCo) ---------- */
@@ -373,7 +406,7 @@
   window.Rice = {
     CFG, DEMO, PURPOSES, purposeOf, statusInfo, ADMIN_STATUS,
     money, dateTH, timeTH, ago, esc, phoneFmt, mapUrl, imgUrl,
-    icon, injectIcons, initAuth, relogin, inLineApp, closeWindow, sendChat,
+    icon, injectIcons, sackLoader, initAuth, relogin, inLineApp, closeWindow, sendChat,
     api, ApiError, toast, modal, confirmBox, busy,
     promptpayPayload, qrDataUrl, resizeImage, getLocation, storage,
   };

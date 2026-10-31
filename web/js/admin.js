@@ -490,7 +490,7 @@
 
   async function boot() {
     R.injectIcons();
-    root.innerHTML = '<div class="splash" style="min-height:100vh;display:grid;place-items:center"><div><span class="spinner"></span><p>กำลังโหลด...</p></div></div>';
+    root.innerHTML = '<div class="splash" style="min-height:100vh;display:grid;place-items:center;text-align:center"><div>' + R.sackLoader('6.5rem') + '<p class="loading-text" style="font-weight:700;margin-top:.6rem">กำลังโหลด...</p></div></div>';
     try {
       await R.initAuth(R.CFG.ADMIN_LIFF_ID || R.CFG.LIFF_ID);
       await load(true);

@@ -420,7 +420,7 @@
     const o = S.orders.find((x) => x.orderId === id);
     if (!o) {
       loadOrder(id);
-      return { back: '#/orders', top: 'ใบสั่งข้าว', body: '<div class="splash" style="min-height:40vh"><div><span class="spinner"></span><p>กำลังเปิดใบสั่งข้าว...</p></div></div>' };
+      return { back: '#/orders', top: 'ใบสั่งข้าว', body: '<div class="splash" style="min-height:40vh"><div>' + R.sackLoader('5.5rem') + '<p class="loading-text">กำลังเปิดใบสั่งข้าว...</p></div></div>' };
     }
     const st = R.statusInfo(o);
     const s = S.settings;
@@ -789,7 +789,8 @@
   /* ---------- เริ่มต้น ---------- */
 
   function splash(text) {
-    return '<div class="splash"><div><img class="splash-logo" src="assets/logo.png" alt="" width="160" height="160"><span class="spinner" aria-hidden="true"></span><h1>' + esc(text) + '</h1></div></div>';
+    return '<div class="splash"><div>' + R.sackLoader('8.5rem') + '<h1 class="loading-text">' + esc(text) + '</h1>' +
+      '<p class="splash-brand"><img src="assets/logo-96.png" alt="" width="40" height="40">' + esc(shopName()) + '</p></div></div>';
   }
 
   async function boot() {
