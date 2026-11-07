@@ -174,15 +174,87 @@
   /* ---------- ขั้นที่ 1: เลือกข้าว ---------- */
 
   VIEWS.shop = function () {
-    const rows = S.products.length
-      ? S.products.map(prodRow).join('')
-      : '<div class="empty">' + icon('rice') + '<p>ตอนนี้ยังไม่มีข้าวให้เลือก กรุณาโทรหาร้าน</p></div>';
+    if (!S.products.length) {
+      return {
+        back: '#/', top: 'สั่งข้าวสาร',
+        body: stepHead(1, 'เลือกข้าวที่ต้องการ', '') + '<div class="prod-list"><div class="empty">' + icon('rice') + '<p>ตอนนี้ยังไม่มีข้าวให้เลือก กรุณาโทรหาร้าน</p></div></div>',
+        bar: shopBar(),
+      };
+    }
     return {
       back: '#/', top: 'สั่งข้าวสาร',
-      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'กดปุ่ม + เพื่อเพิ่มจำนวน') + '<div class="prod-list">' + rows + '</div>',
+      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'กดปุ่ม + เพื่อเพิ่มจำนวน') + shopFilters() +
+        '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
     };
   };
+
+  /* ---------- ค้นหา / กรองข้าว: หมวด, หน่วย, น้ำหนัก ---------- */
+  const F = { q: '', cat: '', unit: '', size: '' };
+
+  const uniq = (arr) => arr.filter((v, i) => v !== '' && v !== null && v !== undefined && arr.indexOf(v) === i);
+  const sizeLabel = (kg) => kg + ' กก.';
+  const fieldOf = (p, key) => String(key === 'cat' ? p.category || '' : key === 'unit' ? p.unit : p.sizeKg);
+
+  /** ข้าวที่ตรงกับตัวกรองทั้งหมด (ยกเว้นตัวกรอง skip) — ใช้นับจำนวนบนปุ่มด้วย */
+  function filtered(skip) {
+    const words = F.q.toLowerCase().replace(/กิโลกรัม|กิโล|กก\.?|kg\.?/g, ' ').split(/\s+/).filter(Boolean);
+    return S.products.filter((p) => {
+      if (skip !== 'cat' && F.cat && fieldOf(p, 'cat') !== F.cat) return false;
+      if (skip !== 'unit' && F.unit && fieldOf(p, 'unit') !== F.unit) return false;
+      if (skip !== 'size' && F.size && fieldOf(p, 'size') !== F.size) return false;
+      if (!words.length) return true;
+      const hay = [p.name, p.detail, p.category, p.unit, p.sku].join(' ').toLowerCase();
+      // ตัวเลขล้วน = ค้นตามน้ำหนัก เช่น "5" หรือ "5 กก." ได้เฉพาะข้าวถุงละ 5 กก.
+      return words.every((w) => (/^\d+(\.\d+)?$/.test(w) ? Number(w) === Number(p.sizeKg) : hay.indexOf(w) >= 0));
+    });
+  }
+
+  function chipRow(key, label, values, fmt) {
+    if (values.length < 2) return '';
+    const pool = filtered(key);
+    const n = (v) => pool.filter((p) => fieldOf(p, key) === String(v)).length;
+    return '<div class="f-row"><span class="f-label">' + esc(label) + '</span><div class="chips f-chips" role="group" aria-label="' + esc(label) + '">' +
+      '<button type="button" class="chip" data-act="filter" data-k="' + key + '" data-v="" aria-pressed="' + !F[key] + '">ทั้งหมด</button>' +
+      values.map((v) => '<button type="button" class="chip" data-act="filter" data-k="' + key + '" data-v="' + esc(v) + '" aria-pressed="' + (F[key] === String(v)) + '"' +
+        (n(v) || F[key] === String(v) ? '' : ' disabled') + '>' + esc(fmt ? fmt(v) : v) + '</button>').join('') +
+      '</div></div>';
+  }
+
+  function filterRows() {
+    const cats = uniq(S.products.map((p) => p.category || ''));
+    const units = uniq(S.products.map((p) => p.unit));
+    const sizes = uniq(S.products.map((p) => Number(p.sizeKg) || 0).filter((k) => k > 0)).sort((a, b) => a - b).map(String);
+    return chipRow('cat', 'หมวด', cats) + chipRow('unit', 'หน่วย', units) + chipRow('size', 'น้ำหนัก', sizes, sizeLabel);
+  }
+
+  function shopFilters() {
+    const rows = filterRows();
+    return '<section class="shop-filter" aria-label="ค้นหาข้าว">' +
+      '<label class="f-search">' + icon('search') + '<span class="sr-only">ค้นหาข้าว</span>' +
+      '<input type="search" class="input" id="shop-q" placeholder="ค้นหา เช่น หอมมะลิ, 5 กก., กระสอบ" value="' + esc(F.q) + '" autocomplete="off"></label>' +
+      '<div id="f-rows">' + rows + '</div></section>';
+  }
+
+  function prodListHtml() {
+    const list = filtered();
+    const active = F.q || F.cat || F.unit || F.size;
+    if (!list.length) {
+      return '<div class="empty">' + icon('search') + '<p>ไม่พบข้าวที่ค้นหา</p>' +
+        '<button type="button" class="btn btn-ghost" data-act="filter-clear">ดูข้าวทั้งหมด</button></div>';
+    }
+    return (active ? '<div class="f-count">พบ ' + list.length + ' จาก ' + S.products.length + ' รายการ' +
+      ' <button type="button" class="linkbtn" data-act="filter-clear">ล้างการค้นหา</button></div>' : '') +
+      list.map(prodRow).join('');
+  }
+
+  /** อัปเดตเฉพาะรายการข้าวและปุ่มกรอง — ช่องค้นหาไม่หลุดโฟกัสระหว่างพิมพ์ */
+  function refreshShop() {
+    const list = document.getElementById('prod-list');
+    if (list) list.innerHTML = prodListHtml();
+    const rows = document.getElementById('f-rows');
+    if (rows) rows.innerHTML = filterRows();
+  }
 
   function prodRow(p) {
     const qty = cart.items[p.id] || 0;
@@ -692,6 +764,14 @@
         R.toast('ขนาดตัวอักษร: ' + next.label);
         break;
       }
+      case 'filter': F[el.dataset.k] = el.dataset.v; refreshShop(); break;
+      case 'filter-clear': {
+        F.q = ''; F.cat = ''; F.unit = ''; F.size = '';
+        const q = document.getElementById('shop-q');
+        if (q) q.value = '';
+        refreshShop();
+        break;
+      }
       case 'inc': setQty(id, (cart.items[id] || 0) + 1); break;
       case 'dec': setQty(id, (cart.items[id] || 0) - 1); break;
       case 'qty': askQty(id); break;
@@ -759,6 +839,7 @@
   });
 
   app.addEventListener('input', (e) => {
+    if (e.target.id === 'shop-q') { F.q = e.target.value; refreshShop(); return; }
     const b = e.target.dataset && e.target.dataset.bind;
     if (!b) return;
     if (b.indexOf('pf.') === 0) { pf[b.slice(3)] = e.target.value; return; }

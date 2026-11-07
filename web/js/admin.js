@@ -432,7 +432,12 @@
       const r = res.result;
       R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')', 'ok');
       render();
-    } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
+    } catch (e) {
+      R.busy(false);
+      if (String(e.code || '').indexOf('zort') === 0) {
+        R.modal({ title: 'ดึงสินค้าจาก ZORT ไม่สำเร็จ', html: '<p style="white-space:pre-line">' + esc(String(e.message).replace(/ \| | → | — /g, '\n')) + '</p>', actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }] });
+      } else R.toast(e.message, 'err');
+    } finally { R.busy(false); }
   }
 
   async function refresh(manual) {
