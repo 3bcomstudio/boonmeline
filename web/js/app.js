@@ -90,10 +90,57 @@
       '<header class="topbar">' +
       (v.back ? '<button type="button" class="topbar-btn" data-act="go" data-to="' + v.back + '">' + icon('back') + '<span>ย้อนกลับ</span></button>' : '<img class="topbar-logo" src="assets/logo-96.png" alt="">') +
       '<div class="topbar-title">' + esc(v.top || shopName()) + '</div>' +
-      '<button type="button" class="topbar-btn size-btn" data-act="size" aria-label="ปรับขนาดตัวอักษร"><small>ก</small><b>ก</b></button>' +
+      '<button type="button" class="topbar-btn size-btn" data-act="size" aria-label="ปรับขนาดตัวอักษร"><span class="sz-glyph" aria-hidden="true"><small>ก</small>ก</span><span class="sz-label">ตัวอักษร</span></button>' +
       '</header>' +
-      '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + '</main>' +
+      '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + siteFoot() + '</main>' +
       (v.bar ? '<div class="actionbar"><div class="actionbar-in">' + v.bar + '</div></div>' : '');
+  }
+
+  /* ---------- ข้อมูลร้าน / ความปลอดภัย (สร้างความมั่นใจว่าเป็นร้านจริง) ---------- */
+  const payeeName = () => String(S.settings.PROMPTPAY_NAME || shopName()).trim();
+  const shopMapUrl = () => {
+    const st = S.settings;
+    if (Number(st.SHOP_LAT) && Number(st.SHOP_LNG)) return R.mapUrl(Number(st.SHOP_LAT), Number(st.SHOP_LNG));
+    return st.SHOP_ADDRESS ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(shopName() + ' ' + st.SHOP_ADDRESS) : '';
+  };
+
+  function shopCard() {
+    const st = S.settings;
+    const row = (ic, html) => '<li>' + icon(ic) + '<span>' + html + '</span></li>';
+    const map = shopMapUrl();
+    return '<section class="shop-card" aria-label="ข้อมูลร้าน">' +
+      '<div class="sc-head"><img src="assets/logo.png" alt="" width="120" height="120">' +
+      '<div><strong>' + esc(shopName()) + '</strong><span>ร้านขายข้าวสาร ส่งถึงบ้าน และรับเองที่ร้าน</span></div></div>' +
+      '<ul class="sc-info">' +
+      (st.SHOP_ADDRESS ? row('store', esc(st.SHOP_ADDRESS) + (map ? ' <a href="' + esc(map) + '" target="_blank" rel="noopener">ดูแผนที่ร้าน</a>' : '')) : '') +
+      (st.SHOP_HOURS ? row('clock', 'เปิด ' + esc(st.SHOP_HOURS)) : '') +
+      (st.SHOP_PHONE ? row('phone', '<a href="' + telLink() + '">' + esc(R.phoneFmt(st.SHOP_PHONE)) + '</a>') : '') +
+      (st.SHOP_TAX_ID ? row('receipt', 'เลขทะเบียนนิติบุคคล ' + esc(st.SHOP_TAX_ID)) : '') +
+      '</ul></section>';
+  }
+
+  function safetyNote(compact) {
+    const items = [
+      'ร้านแจ้งราคาในแชท LINE ของร้าน และในหน้านี้เท่านั้น',
+      'โอนเงินเข้าบัญชีชื่อ <b>' + esc(payeeName()) + '</b> เท่านั้น',
+      'ร้านจะไม่ขอรหัส OTP รหัส ATM หรือรหัสผ่านแอปธนาคารของคุณ',
+    ];
+    return '<aside class="safety' + (compact ? ' compact' : '') + '" aria-label="ข้อควรรู้เพื่อความปลอดภัย">' +
+      '<div class="safety-h">' + icon('alert') + '<strong>ข้อควรรู้เพื่อความปลอดภัย</strong></div>' +
+      '<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>' +
+      (S.settings.SHOP_PHONE ? '<p>สงสัยอะไร โทรถามร้านได้ที่ <a href="' + telLink() + '">' + esc(R.phoneFmt(S.settings.SHOP_PHONE)) + '</a></p>' : '') +
+      '</aside>';
+  }
+
+  function siteFoot() {
+    if (!S.loaded) return '';
+    const st = S.settings;
+    return '<footer class="site-foot">' +
+      '<strong>' + esc(shopName()) + '</strong>' +
+      (st.SHOP_ADDRESS ? '<span>' + esc(st.SHOP_ADDRESS) + '</span>' : '') +
+      '<span>' + [st.SHOP_PHONE ? 'โทร ' + esc(R.phoneFmt(st.SHOP_PHONE)) : '', st.SHOP_TAX_ID ? 'เลขทะเบียน ' + esc(st.SHOP_TAX_ID) : ''].filter(Boolean).join(' · ') + '</span>' +
+      '<span class="sf-note">' + icon('check') + 'ข้อมูลของคุณใช้เพื่อจัดส่งข้าวและติดต่อกลับเท่านั้น</span>' +
+      '</footer>';
   }
 
   function demoBanner() {
@@ -145,9 +192,7 @@
 
     return {
       body:
-        '<div class="brand-hero"><img src="assets/logo.png" alt="โลโก้ ' + esc(shopName()) + '" width="160" height="160">' +
-        '<div><strong>' + esc(shopName()) + '</strong><span>ร้านข้าวสาร สั่งง่ายผ่าน LINE</span></div></div>' +
-        '<div class="hello"><small>สวัสดีค่ะ</small><strong>คุณ' + esc(first) + '</strong></div>' + alert +
+        '<div class="hello"><small>สวัสดี</small><strong>คุณ' + esc(first) + '</strong></div>' + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
         '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">เลือกข้าว บอกจำนวน แล้วร้านคิดราคาให้</span></span></button>' +
@@ -158,9 +203,10 @@
           '<span class="mi-text"><strong>โทรหาร้าน</strong><span class="mi-sub">' + esc(R.phoneFmt(S.settings.SHOP_PHONE)) + (S.settings.SHOP_HOURS ? ' (' + esc(S.settings.SHOP_HOURS) + ')' : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
         '</nav>' +
         '<section class="how"><h2>สั่งข้าวง่าย ๆ 3 ขั้นตอน</h2><ol>' +
-        '<li><b>1</b><span>เลือกข้าวและจำนวนถุง</span></li>' +
-        '<li><b>2</b><span>ร้านคิดราคา แล้วส่งมาทาง LINE</span></li>' +
-        '<li><b>3</b><span>กดยืนยัน แล้วจ่ายเงิน</span></li></ol></section>',
+        '<li><b>1</b><span>เลือกข้าวและจำนวนที่ต้องการ</span></li>' +
+        '<li><b>2</b><span>ร้านคิดราคา แล้วส่งมาทาง LINE <small>ยังไม่ต้องจ่ายเงินตอนสั่ง</small></span></li>' +
+        '<li><b>3</b><span>กดยืนยันราคา แล้วจ่ายเงิน หรือจ่ายเงินสดตอนรับข้าว</span></li></ol></section>' +
+        shopCard() + safetyNote(),
     };
   };
 
@@ -585,7 +631,7 @@
         '<h1 class="page-title">ส่งใบสั่งข้าวให้ร้านแล้ว</h1>' +
         '<div class="order-no">เลขที่ ' + esc(id) + '</div>' +
         '<p>ร้านกำลังคิดราคา แล้วจะส่งราคามาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
-        '<p style="margin-top:.5rem">ตอนนี้ไม่ต้องทำอะไรเพิ่ม รอข้อความจากร้านได้เลยค่ะ</p></div>' +
+        '<p style="margin-top:.5rem">ตอนนี้ไม่ต้องทำอะไรเพิ่ม รอข้อความจากร้านได้เลย</p></div>' +
         '<div class="stack">' +
         (R.inLineApp() ? '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="close">' + icon('chat') + ' กลับไปที่แชท LINE</button>' : '') +
         '<button type="button" class="btn btn-ghost btn-lg btn-block" data-act="go" data-to="#/order/' + esc(id) + '">ดูใบสั่งข้าวนี้</button>' +
@@ -728,14 +774,16 @@
         ? '<span class="pp-logo">พร้อมเพย์ PromptPay</span>' +
           '<div class="qr-amt">฿' + money(o.total) + '</div>' +
           '<img src="' + qr + '" alt="QR พร้อมเพย์ ยอด ' + money(o.total) + ' บาท" width="300" height="300">' +
-          (s.PROMPTPAY_NAME ? '<p>ชื่อบัญชี <strong>' + esc(s.PROMPTPAY_NAME) + '</strong></p>' : '') +
+          '<div class="payee"><span>ชื่อบัญชีผู้รับเงิน</span><strong>' + esc(payeeName()) + '</strong>' +
+          '<small>ก่อนกดยืนยันในแอปธนาคาร ตรวจว่าชื่อผู้รับตรงกับชื่อนี้ ถ้าไม่ตรง อย่าโอน และโทรหาร้าน' +
+          (s.SHOP_PHONE ? ' <a href="' + telLink() + '">' + esc(R.phoneFmt(s.SHOP_PHONE)) + '</a>' : '') + '</small></div>' +
           '<div class="qr-help"><strong>วิธีจ่าย</strong><ol>' +
           '<li>กดค้างที่รูป QR แล้วเลือก "บันทึกรูป"</li>' +
           '<li>เปิดแอปธนาคาร เลือก "สแกน" แล้วเลือกรูปที่บันทึกไว้</li>' +
           '<li>จ่ายเสร็จแล้ว กลับมากดปุ่ม "ส่งรูปสลิป" ด้านล่าง</li></ol></div>'
         : '<div class="qr-amt">฿' + money(o.total) + '</div>') +
       (s.BANK_INFO ? '<p class="qr-help">' + esc(s.BANK_INFO) + '</p>' : '') +
-      '</div></section>';
+      '</div>' + safetyNote(true) + '</section>';
   }
 
   function slipButton(o, label, ghost) {
@@ -834,8 +882,8 @@
     return {
       back: isNew ? '' : '#/', top: isNew ? shopName() : 'ข้อมูลของฉัน',
       body:
-        '<h1 class="page-title">' + (isNew ? 'ยินดีต้อนรับค่ะ' : 'ข้อมูลของฉัน') + '</h1>' +
-        '<p class="page-lead" style="margin-bottom:1.1rem">' + (isNew ? 'กรอกข้อมูลผู้สั่งครั้งเดียว ครั้งต่อไปไม่ต้องกรอกอีก' : 'แก้ไขแล้วกดบันทึก') + '</p>' +
+        '<h1 class="page-title">' + (isNew ? 'ยินดีต้อนรับ' : 'ข้อมูลของฉัน') + '</h1>' +
+        '<p class="page-lead" style="margin-bottom:1.1rem">' + (isNew ? 'กรอกข้อมูลผู้สั่งครั้งเดียว ครั้งต่อไปไม่ต้องกรอกอีก (ใช้เวลาประมาณ 1 นาที)' : 'แก้ไขแล้วกดบันทึก') + '</p>' +
         '<div class="panel">' +
         '<label class="field"><span class="field-label">ชื่อ-นามสกุล</span><input class="input" id="pf-fullName" data-bind="pf.fullName" value="' + esc(pf.fullName) + '" autocomplete="name" maxlength="100"></label>' +
         '<label class="field"><span class="field-label">เบอร์โทรศัพท์</span><input class="input" id="pf-phone" data-bind="pf.phone" value="' + esc(pf.phone) + '" type="tel" inputmode="numeric" autocomplete="tel" maxlength="12" placeholder="08x-xxx-xxxx">' +
@@ -844,6 +892,7 @@
         '<span class="field-hint">ถ้ามารับเองที่ร้าน ไม่ต้องกรอกก็ได้</span></label>' +
         locBlock('pf', pf.lat, pf.lng) +
         '</div>' +
+        '<p class="privacy">' + icon('check') + '<span>ร้านใช้ข้อมูลนี้เพื่อจัดส่งข้าวและโทรติดต่อคุณเท่านั้น ไม่ส่งต่อให้ผู้อื่น แก้ไขได้ทุกเมื่อที่เมนู "ข้อมูลของฉัน"</span></p>' +
         '<section class="section"><h2 class="section-title">ปกติซื้อข้าวไปใช้ทำอะไร</h2><div class="tiles">' + tiles + '</div></section>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="save-profile" data-id="' + (isNew ? 'new' : '') + '">' +
         icon('check') + (isNew ? ' บันทึก แล้วเริ่มสั่งข้าว' : ' บันทึกข้อมูล') + '</button>',

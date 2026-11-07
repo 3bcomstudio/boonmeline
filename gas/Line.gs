@@ -123,7 +123,7 @@ function shopName_(s) { return String(s.SHOP_NAME || 'หจก.บุญมี�
 
 function flexWelcome_(s) {
   return flex_('ยินดีต้อนรับสู่ ' + shopName_(s) + ' — กดปุ่ม "สั่งข้าวสาร" เพื่อเริ่มสั่ง', bubble_({
-    title: 'ยินดีต้อนรับค่ะ',
+    title: 'ยินดีต้อนรับ',
     subtitle: shopName_(s),
     hero: /^https:\/\//.test(String(s.LOGO_URL || '')) ? String(s.LOGO_URL) : '',
     body: [
@@ -165,6 +165,7 @@ function flexQuote_(o, s) {
   });
   if (q.note) body.push(t_('ข้อความจากร้าน: ' + q.note, { size: 'md', color: C.ink2, margin: 'lg' }));
   body.push(t_('กดปุ่มด้านล่าง เพื่อยืนยันและเลือกวิธีจ่ายเงิน', { size: 'sm', color: C.ink3, margin: 'lg' }));
+  body.push(t_('โอนเข้าบัญชีชื่อ "' + String(s.PROMPTPAY_NAME || shopName_(s)) + '" เท่านั้น · ร้านไม่ขอรหัส OTP หรือรหัสผ่านธนาคาร', { size: 'xs', color: C.ink3, margin: 'md' }));
 
   return flex_('ร้านแจ้งราคา #' + o.orderId + ' ยอด ฿' + money_(q.total) + ' — กดเพื่อยืนยัน', bubble_({
     title: 'ร้านแจ้งราคาแล้ว',
@@ -192,13 +193,13 @@ function statusCopy_(o, s, from) {
     case 'slip':
       return { title: 'ร้านได้รับสลิปแล้ว', text: 'ร้านกำลังตรวจสอบยอดเงิน แล้วจะแจ้งให้ทราบในแชทนี้', bg: C.brand, btn: 'ดูใบสั่งข้าว' };
     case 'paid':
-      return { title: 'ได้รับเงินแล้ว ขอบคุณค่ะ', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ได้รับเงินแล้ว ขอบคุณที่อุดหนุน', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูใบสั่งข้าว' };
     case 'shipping':
       return pickup
         ? { title: 'ข้าวพร้อมแล้ว มารับได้เลย', text: 'มารับที่ร้าน' + (s.SHOP_ADDRESS ? ': ' + s.SHOP_ADDRESS : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' }
         : { title: 'ข้าวกำลังไปส่ง', text: 'ร้านกำลังนำข้าวไปส่ง' + (o.payMethod === 'cod' ? ' เตรียมเงินสด ' + total + ' ไว้ด้วยนะคะ' : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' };
     case 'done':
-      return { title: 'ได้รับข้าวเรียบร้อย', text: 'ขอบคุณที่อุดหนุน' + shopName_(s) + 'ค่ะ', bg: C.green, btn: 'สั่งข้าวอีกครั้ง', home: true };
+      return { title: 'ได้รับข้าวเรียบร้อย', text: 'ขอบคุณที่อุดหนุน' + shopName_(s), bg: C.green, btn: 'สั่งข้าวอีกครั้ง', home: true };
     case 'cancelled':
       return { title: 'ยกเลิกการสั่งข้าวแล้ว', text: o.cancelReason || 'ยกเลิกแล้ว', bg: C.red, btn: 'ดูใบสั่งข้าว' };
   }
@@ -298,7 +299,7 @@ function handleWebhook_(body) {
         const list = ordersOfUser_(uid);
         reply_(ev.replyToken, [list.length
           ? flexStatus_(list[0], s)
-          : { type: 'text', text: 'ยังไม่เคยสั่งข้าวค่ะ พิมพ์ "สั่งข้าว" เพื่อเริ่มสั่ง' }]);
+          : { type: 'text', text: 'ยังไม่เคยสั่งข้าว พิมพ์ "สั่งข้าว" เพื่อเริ่มสั่ง' }]);
       }
       // ข้อความอื่น ๆ ปล่อยให้แอดมินตอบเองใน LINE OA Manager
     } catch (err) {

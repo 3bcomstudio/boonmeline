@@ -35,7 +35,7 @@
         return pickup
           ? { label: 'ข้าวพร้อมให้มารับ', tone: 'green', icon: 'store', next: 'มารับข้าวที่ร้านได้เลย' }
           : { label: 'กำลังไปส่ง', tone: 'green', icon: 'truck', next: 'ข้าวกำลังเดินทางไปหาคุณ' };
-      case 'done': return { label: 'ได้รับข้าวแล้ว', tone: 'green', icon: 'check', next: 'ขอบคุณที่อุดหนุนค่ะ' };
+      case 'done': return { label: 'ได้รับข้าวแล้ว', tone: 'green', icon: 'check', next: 'ขอบคุณที่อุดหนุน' };
       case 'cancelled': return { label: 'ยกเลิกแล้ว', tone: 'red', icon: 'x', next: o.cancelReason || '' };
     }
     return { label: o.status, tone: 'blue', icon: 'clock', next: '' };
