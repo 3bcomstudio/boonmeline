@@ -48,6 +48,7 @@
       '<button type="button" class="tbtn" data-act="sound" aria-pressed="' + sound + '">' + icon('bell') + 'เสียงเตือน</button>' +
       '<button type="button" class="tbtn" data-act="csv">' + icon('download') + 'ดาวน์โหลด CSV</button>' +
       (!R.DEMO ? '<button type="button" class="tbtn" data-act="zort" title="' + esc(zortTitle()) + '">' + icon('refresh') + 'ดึงสินค้าจาก ZORT</button>' : '') +
+      (A.zort && A.zort.imageFolderUrl ? '<a class="tbtn" href="' + esc(A.zort.imageFolderUrl) + '" target="_blank" rel="noopener" title="ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า แล้วกดดึงสินค้าจาก ZORT">' + icon('sheet') + 'โฟลเดอร์รูปสินค้า</a>' : '') +
       (A.sheetUrl ? '<a class="tbtn" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">' + icon('sheet') + 'Google Sheet</a>' : '') +
       '</div></header>' +
       '<section class="kpis" id="kpis">' + kpis() + '</section>' +
@@ -430,7 +431,9 @@
       const res = await R.api('adminZortSync');
       A.products = res.products; A.zort = res.zort;
       const r = res.result;
-      R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')', 'ok');
+      const im = r.images || {};
+      R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')' +
+        (r.images ? ' · รูป: Drive ' + (im.drive || 0) + ', ZORT ' + (im.zort || 0) + ', ไม่มีรูป ' + (im.none || 0) : ''), 'ok');
       render();
     } catch (e) {
       R.busy(false);

@@ -25,6 +25,7 @@
  *   zortListCategories()  — แสดงหมวดสินค้าทั้งหมดพร้อม id
  *   zortPreview()         — แสดงสินค้าที่จะถูกดึง (ยังไม่เขียนชีต)
  *   syncZortProducts()    — ล้างแท็บ Products แล้วเขียนสินค้าข้าวจาก ZORT ลงไปใหม่ (ลบข้าวเดิมที่ไม่ได้มาจาก ZORT)
+ *   productImageFolder()  — แสดงลิงก์โฟลเดอร์รูปสินค้าใน Google Drive (ตั้งชื่อไฟล์ตาม SKU/ชื่อสินค้า)
  *   installZortTrigger()  — ตั้งให้ซิงก์อัตโนมัติทุก 1 ชั่วโมง
  *   removeZortTrigger()   — ยกเลิกการซิงก์อัตโนมัติ
  */
@@ -217,10 +218,77 @@ function zortToProduct_(z) {
     unit: clean_(z.unittext, 20) || 'ถุง',
     price: round2_(num_(z.sellprice)),
     stock: num_(z.availablestock),
-    image: /^https:\/\//i.test(String(z.imagepath || '')) ? String(z.imagepath) : '',
+    image: zortImageUrl_(z),
+    fullName: fullName,
     category: clean_(z.category, 80),
     active: z.active !== false,
   };
+}
+
+/** รูปจาก ZORT: imagepath ก่อน ถ้าไม่มีใช้รูปแรกใน imageList (เฉพาะ https) */
+function zortImageUrl_(z) {
+  const list = [z.imagepath].concat(Array.isArray(z.imageList) ? z.imageList : []);
+  for (let i = 0; i < list.length; i++) {
+    const u = String(list[i] || '').trim();
+    if (/^https:\/\//i.test(u)) return u;
+  }
+  return '';
+}
+
+/* =========================================================
+ * รูปสินค้าจาก Google Drive — โฟลเดอร์ "รูปสินค้า — ระบบสั่งข้าว"
+ *   ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า แล้ววางในโฟลเดอร์ ระบบจับคู่ให้ทุกครั้งที่ซิงก์
+ *   ลำดับการจับคู่: SKU → ชื่อเต็มใน ZORT (มีขนาด) → ชื่อสินค้า (ใช้ร่วมทุกขนาด)
+ *   ไม่สนตัวพิมพ์ ช่องว่าง จุด และนามสกุลไฟล์ เช่น "ข้าวหอมมะลิ 5 กก.jpg" = "ข้าวหอมมะลิ5กก"
+ * ========================================================= */
+
+function productImageFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('PRODUCT_IMG_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* สร้างใหม่ */ } }
+  const folder = DriveApp.createFolder('รูปสินค้า — ระบบสั่งข้าว');
+  folder.setDescription('ตั้งชื่อไฟล์รูปตาม SKU หรือชื่อสินค้าใน ZORT เช่น P0002.jpg หรือ ข้าวหอมมะลิ ตราฉัตรทอง.jpg — ระบบจับคู่ให้ทุกครั้งที่ดึงสินค้าจาก ZORT');
+  props.setProperty('PRODUCT_IMG_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+const imgKey_ = function (s) {
+  return String(s || '').replace(/\.(jpe?g|png|webp|gif|heic)$/i, '').toLowerCase().replace(/[\s.]+/g, '');
+};
+
+/** อ่านรูปทั้งหมดในโฟลเดอร์ → { คีย์ชื่อ: url } (เปิดสิทธิ์ "ทุกคนที่มีลิงก์ดูได้" ให้เอง) */
+function driveImageMap_() {
+  const map = {};
+  const folder = productImageFolder_();
+  const it = folder.getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!/^image\//.test(f.getMimeType())) continue;
+    try {
+      if (f.getSharingAccess() !== DriveApp.Access.ANYONE_WITH_LINK && f.getSharingAccess() !== DriveApp.Access.ANYONE) {
+        f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      }
+    } catch (e) { console.error('ตั้งสิทธิ์รูป ' + f.getName() + ' ไม่ได้: ' + e.message); continue; }
+    // ลิงก์รูปขนาดพอดีมือถือ (https) ใช้ได้ทั้งหน้าเว็บและข้อความ LINE
+    map[imgKey_(f.getName())] = 'https://lh3.googleusercontent.com/d/' + f.getId() + '=w600';
+  }
+  return map;
+}
+
+/** เลือกรูปของสินค้า: รูปใน Drive (ร้านเลือกเอง) ก่อน → รูปจาก ZORT → ไม่มีรูป */
+function resolveImage_(z, driveMap) {
+  const keys = [z.sku, z.fullName, z.name];
+  for (let i = 0; i < keys.length; i++) {
+    const k = imgKey_(keys[i]);
+    if (k && driveMap[k]) return { url: driveMap[k], from: 'drive' };
+  }
+  if (z.image) return { url: z.image, from: 'zort' };
+  return { url: '', from: 'none' };
+}
+
+/** รันเพื่อดูลิงก์โฟลเดอร์รูปสินค้า */
+function productImageFolder() {
+  console.log('📁 โฟลเดอร์รูปสินค้า: ' + productImageFolder_().getUrl());
 }
 
 /** ขนาดถุง (กก.) — อ่านจากชื่อสินค้าก่อน เช่น "ข้าวหอมมะลิ 5 กก." ถ้าไม่มีใช้น้ำหนักใน ZORT (กรัม) */
@@ -263,15 +331,21 @@ function syncZortProducts() {
       else removed++;
     });
 
+    let driveMap = {};
+    try { driveMap = driveImageMap_(); } catch (err) { console.error('อ่านโฟลเดอร์รูปไม่ได้: ' + err.message); }
+    const imgStat = { drive: 0, zort: 0, none: 0 };
+
     const now = new Date();
     let nextSort = Object.keys(keep).reduce(function (m, k) { return Math.max(m, num_(keep[k].sort)); }, 0) + 1;
     let added = 0;
     const objs = items.map(function (z) {
       const old = keep[z.zortId];
       if (!old) added++;
+      const img = resolveImage_(z, driveMap);
+      imgStat[img.from]++;
       return {
         id: 'z' + z.zortId, name: z.name, detail: z.detail, category: z.category, sizeKg: z.sizeKg, unit: z.unit,
-        price: z.price, priceWholesale: old ? old.priceWholesale : '', image: z.image, active: z.active,
+        price: z.price, priceWholesale: old ? old.priceWholesale : '', image: img.url, active: z.active,
         sort: old && num_(old.sort) ? num_(old.sort) : nextSort++,
         sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now,
       };
@@ -290,6 +364,7 @@ function syncZortProducts() {
     const result = {
       fetched: items.length, updated: items.length - added, added: added,
       removed: removed + gone, at: now.toISOString(),
+      images: imgStat,
     };
     PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(result));
     console.log('ZORT sync: ' + JSON.stringify(result));
@@ -298,7 +373,12 @@ function syncZortProducts() {
 }
 
 function zortStatus_() {
-  return { configured: zortConfigured_(), lastSync: parseJson_(prop_('ZORT_LAST_SYNC'), null) };
+  const folderId = prop_('PRODUCT_IMG_FOLDER_ID');
+  return {
+    configured: zortConfigured_(),
+    lastSync: parseJson_(prop_('ZORT_LAST_SYNC'), null),
+    imageFolderUrl: folderId ? 'https://drive.google.com/drive/folders/' + folderId : '',
+  };
 }
 
 /* =========================================================
@@ -345,6 +425,7 @@ function zortPreview() {
   const items = zortFetchRiceProducts_();
   console.log('จะดึงสินค้า ' + items.length + ' รายการ');
   items.forEach(function (p) {
-    console.log('#' + p.zortId + ' | ' + p.sku + ' | ' + p.name + ' | ' + p.sizeKg + ' กก. | ฿' + p.price + ' | สต็อก ' + p.stock + ' ' + p.unit);
+    console.log('#' + p.zortId + ' | ' + p.sku + ' | ' + p.name + ' | ' + p.sizeKg + ' กก. | ฿' + p.price + ' | สต็อก ' + p.stock + ' ' + p.unit +
+      ' | รูป: ' + (p.image ? 'มีใน ZORT' : 'ไม่มี — วางไฟล์ชื่อ "' + (p.sku || p.name) + '.jpg" ในโฟลเดอร์รูปสินค้า'));
   });
 }
