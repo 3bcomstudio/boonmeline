@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  const KEY = 'rice_demo_db_v1';
+  const KEY = 'rice_demo_db_v2';
   const ME = { userId: 'Udemo-me', name: 'คุณยายสมศรี', picture: '' };
 
   const PURPOSE_LABEL = { home: 'กินเองที่บ้าน', donate: 'ทำบุญ / บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง / ขายต่อ', other: 'อื่น ๆ' };
@@ -13,20 +13,14 @@
     slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'],
   };
 
+  /* สินค้าตัวอย่างสำหรับโหมดทดลองเท่านั้น — ระบบจริงดึงข้าวจาก ZORT */
   const PRODUCTS = [
-    ['p01', 'ตราฉัตรทอง', 'ข้าวหอมมะลิแท้ 100%', 5, 'ถุง', 245, 225, 'chatthong'],
-    ['p02', 'ตราหงษ์ทอง', 'ข้าวหอมมะลิ 100%', 5, 'ถุง', 240, 220, 'hongthong'],
-    ['p03', 'มาบุญครอง', 'ข้าวหอมมะลิ 100%', 5, 'ถุง', 230, 210, 'mahboonkrong'],
-    ['p04', 'ตราเบญจรงค์', 'ข้าวขาวหอมมะลิ ชาววัง', 5, 'ถุง', 255, 235, 'benjarong'],
-    ['p05', 'ตราพนมรุ้ง', 'ข้าวขาวหอมมะลิ 100%', 5, 'ถุง', 225, 205, 'phanomrung'],
-    ['p06', 'ตราปิ่นเงิน', 'ข้าวขาวหอมมะลิ 100%', 5, 'ถุง', 215, 195, 'pinngoen'],
-    ['p07', 'ตราแสนดี', 'ข้าวขาวหอมมะลิแท้ 100%', 5, 'ถุง', 210, 190, 'saendee'],
-    ['p08', 'ตราธรรม', 'ข้าวหอมใหม่ คัดพิเศษ', 5, 'ถุง', 220, 200, 'tham'],
-    ['p09', 'ตราไดโนเสาร์', 'ข้าวหอมมะลิ 100%', 15, 'กระสอบ', 590, 550, 'dinosaur'],
-    ['p10', 'ตราเพชร 101', 'ข้าวหอมมะลิแท้ 100% ทุ่งกุลาร้องไห้', 15, 'กระสอบ', 650, 610, 'diamond101'],
+    ['p01', 'ข้าวตัวอย่าง A', 'ตัวอย่าง (ระบบจริงดึงจาก ZORT)', 5, 'ถุง', 200, 180],
+    ['p02', 'ข้าวตัวอย่าง B', 'ตัวอย่าง (ระบบจริงดึงจาก ZORT)', 5, 'ถุง', 220, 200],
+    ['p03', 'ข้าวตัวอย่าง C', 'ตัวอย่าง (ระบบจริงดึงจาก ZORT)', 15, 'กระสอบ', 600, 560],
   ].map((r, i) => ({
     id: r[0], name: r[1], detail: r[2], sizeKg: r[3], unit: r[4], price: r[5], priceWholesale: r[6],
-    image: 'assets/products/' + r[7] + '.jpg', active: true, sort: i + 1,
+    image: '', active: true, sort: i + 1,
   }));
 
   const SETTINGS = {
@@ -66,15 +60,15 @@
       const sub = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
       return { lines: lines.map((l) => Object.assign({ amount: l.qty * l.unitPrice }, l)), subtotal: sub, shippingFee: ship, discount: 0, total: sub + ship, note: '' };
     };
-    const quote2 = q([{ productId: 'p02', name: 'ตราหงษ์ทอง', sizeKg: 5, unit: 'ถุง', qty: 20, unitPrice: 215 }], 0);
-    const quote3 = q([{ productId: 'p10', name: 'ตราเพชร 101', sizeKg: 15, unit: 'กระสอบ', qty: 2, unitPrice: 650 }], 0);
+    const quote2 = q([{ productId: 'p02', name: 'ข้าวตัวอย่าง B', sizeKg: 5, unit: 'ถุง', qty: 20, unitPrice: 200 }], 0);
+    const quote3 = q([{ productId: 'p03', name: 'ข้าวตัวอย่าง C', sizeKg: 15, unit: 'กระสอบ', qty: 2, unitPrice: 600 }], 0);
     return {
       customers: {},
       orders: [
-        mk('R000000-901', 12, c1, 'donate', 'ถวายวัดโคกนาว งานกฐิน', [['p01', 10], ['p05', 5]], 'delivery'),
+        mk('R000000-901', 12, c1, 'donate', 'ถวายวัดโคกนาว งานกฐิน', [['p01', 10], ['p02', 5]], 'delivery'),
         mk('R000000-902', 95, c2, 'restaurant', 'ร้านข้าวแกงนายหมู', [['p02', 20]], 'delivery',
           { status: 'slip', quote: quote2, total: quote2.total, payMethod: 'transfer', slipUrl: '#demo-slip', quotedAt: iso(80), confirmedAt: iso(60), slipAt: iso(40) }),
-        mk('R000000-903', 60 * 26, c3, 'home', '', [['p10', 2]], 'pickup',
+        mk('R000000-903', 60 * 26, c3, 'home', '', [['p03', 2]], 'pickup',
           { status: 'done', quote: quote3, total: quote3.total, payMethod: 'cod', quotedAt: iso(60 * 25), confirmedAt: iso(60 * 24), paidAt: iso(60 * 20), doneAt: iso(60 * 20) }),
       ],
       seq: 0,
@@ -175,6 +169,7 @@
     adminBootstrap(db) {
       return { admin: { userId: ME.userId, name: 'แอดมิน (ทดลอง)' }, orders: db.orders, products: PRODUCTS, settings: SETTINGS, sheetUrl: '', serverTime: new Date().toISOString() };
     },
+    adminZortSync() { err('demo', 'โหมดทดลองเชื่อม ZORT ไม่ได้ — ต้องตั้งค่า Apps Script ก่อน'); },
     adminQuote(db, req) {
       const o = db.orders.find((x) => x.orderId === req.orderId) || err('not_found', 'ไม่พบคำสั่งซื้อ');
       if (['new', 'quoted', 'confirmed'].indexOf(o.status) < 0) err('bad_status', 'ส่งราคาไม่ได้ในสถานะนี้');

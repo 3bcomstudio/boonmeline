@@ -4,7 +4,7 @@
   const R = window.Rice;
   const { esc, icon, money } = R;
 
-  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', filter: 'todo', q: '', sel: '', loadedAt: 0 };
+  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', zort: null, filter: 'todo', q: '', sel: '', loadedAt: 0 };
   const root = document.getElementById('admin');
   const SOUND_KEY = 'rice_admin_sound';
   let sound = R.storage(SOUND_KEY) === true;
@@ -47,6 +47,7 @@
       '<button type="button" class="tbtn" data-act="refresh">' + icon('refresh') + 'รีเฟรช</button>' +
       '<button type="button" class="tbtn" data-act="sound" aria-pressed="' + sound + '">' + icon('bell') + 'เสียงเตือน</button>' +
       '<button type="button" class="tbtn" data-act="csv">' + icon('download') + 'ดาวน์โหลด CSV</button>' +
+      (A.zort && A.zort.configured ? '<button type="button" class="tbtn" data-act="zort" title="' + esc(zortTitle()) + '">' + icon('refresh') + 'ดึงสินค้าจาก ZORT</button>' : '') +
       (A.sheetUrl ? '<a class="tbtn" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">' + icon('sheet') + 'Google Sheet</a>' : '') +
       '</div></header>' +
       '<section class="kpis" id="kpis">' + kpis() + '</section>' +
@@ -399,7 +400,7 @@
   async function load(first) {
     const data = await R.api('adminBootstrap');
     A.orders = data.orders; A.products = data.products; A.settings = data.settings;
-    A.admin = data.admin; A.sheetUrl = data.sheetUrl; A.loadedAt = Date.now();
+    A.admin = data.admin; A.sheetUrl = data.sheetUrl; A.zort = data.zort || null; A.loadedAt = Date.now();
     const newIds = A.orders.filter((o) => o.status === 'new').map((o) => o.orderId);
     if (knownNew && !first) {
       const fresh = newIds.filter((id) => knownNew.indexOf(id) < 0);
@@ -410,6 +411,22 @@
     }
     knownNew = newIds;
     document.title = (newIds.length ? '(' + newIds.length + ') ' : '') + 'หลังร้าน — ' + (A.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่');
+  }
+
+  function zortTitle() {
+    const l = A.zort && A.zort.lastSync;
+    return l ? 'ซิงก์ล่าสุด ' + new Date(l.at).toLocaleString('th-TH') + ' — ' + l.fetched + ' รายการ' : 'ยังไม่เคยซิงก์';
+  }
+
+  async function zortSync() {
+    R.busy(true, 'กำลังดึงสินค้าจาก ZORT...');
+    try {
+      const res = await R.api('adminZortSync');
+      A.products = res.products; A.zort = res.zort;
+      const r = res.result;
+      R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')', 'ok');
+      render();
+    } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
 
   async function refresh(manual) {
@@ -442,6 +459,7 @@
         R.toast(sound ? 'เปิดเสียงเตือนคำสั่งซื้อใหม่' : 'ปิดเสียงเตือน');
         break;
       case 'csv': exportCsv(); break;
+      case 'zort': zortSync(); break;
       case 'send-quote': sendQuote(); break;
       case 'use-ship': {
         const o = A.orders.find((x) => x.orderId === A.sel);
