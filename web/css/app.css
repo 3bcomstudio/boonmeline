@@ -122,6 +122,24 @@ html[data-size="xl"] { font-size: 23px; }
 .prod-detail { color: var(--ink-2); font-size: .95rem; line-height: 1.4; }
 .prod-size { color: var(--brand); font-weight: 700; font-size: .95rem; margin-top: .15rem; }
 .prod-qty { grid-column: 1 / -1; margin-top: .45rem; }
+.variants { grid-column: 1 / -1; margin-top: .35rem; }
+.variants-label { font-size: .9rem; font-weight: 700; color: var(--ink-2); margin-bottom: .35rem; }
+.vchips { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 5.6rem), 1fr)); gap: .45rem; }
+.vchip {
+  position: relative; display: grid; place-items: center; align-content: center; gap: 0; width: 100%;
+  min-height: 3.5rem; padding: .35rem .5rem; border-radius: var(--r-sm); text-align: center;
+  background: var(--surface); border: 2px solid var(--line); color: var(--ink); cursor: pointer;
+}
+.vchip-kg { font-weight: 700; font-size: 1.05rem; line-height: 1.25; }
+.vchip-unit { font-size: .85rem; font-weight: 600; color: var(--ink-3); line-height: 1.2; }
+.vchip[aria-pressed="true"] .vchip-unit { color: rgba(255, 255, 255, .85); }
+.vchip:hover { border-color: var(--brand); }
+.vchip[aria-pressed="true"] { border-color: var(--brand); background: var(--brand); color: #fff; box-shadow: 0 2px 0 var(--brand-800); }
+.vchip-n {
+  position: absolute; top: -.55rem; right: -.4rem;
+  min-width: 1.6rem; height: 1.6rem; padding: 0 .4rem; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--surface);
+  border-radius: 999px; background: var(--gold); color: var(--ink); font-size: .85rem;
+}
 
 .stepper {
   display: grid; grid-template-columns: 3.5rem 1fr 3.5rem;

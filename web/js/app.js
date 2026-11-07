@@ -251,8 +251,8 @@
   function openFilterSheet(key) {
     const f = FILTERS.find((x) => x.key === key);
     const pool = filtered(key);
-    const opts = [{ v: '', label: f.all, n: pool.length }].concat(filterValues(key).map((v) => ({
-      v, label: f.fmt(v), n: pool.filter((p) => fieldOf(p, key) === v).length,
+    const opts = [{ v: '', label: f.all, n: countGroups(pool) }].concat(filterValues(key).map((v) => ({
+      v, label: f.fmt(v), n: countGroups(pool.filter((p) => fieldOf(p, key) === v)),
     })));
     const withSearch = opts.length > 10;
 
@@ -323,9 +323,70 @@
       return '<div class="empty">' + icon('search') + '<p>ไม่พบข้าวที่ค้นหา</p>' +
         '<button type="button" class="btn btn-ghost" data-act="filter-clear">ดูข้าวทั้งหมด</button></div>';
     }
-    return (active ? '<div class="f-count"><span>พบ <b>' + list.length + '</b> จาก ' + S.products.length + ' รายการ</span>' +
+    const groups = groupsOf(list);
+    return (active ? '<div class="f-count"><span>พบ <b>' + groups.length + '</b> จาก ' + countGroups(S.products) + ' ชนิด</span>' +
       '<button type="button" class="linkbtn" data-act="filter-clear">ล้างตัวกรอง</button></div>' : '') +
-      list.map(prodRow).join('');
+      groups.map(prodCard).join('');
+  }
+
+  /* ---------- ข้าวชื่อเดียวกัน หลายขนาด/หน่วย → การ์ดเดียว เลือกขนาดได้ ---------- */
+  const gkey = (p) => String(p.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const variantLabel = (p) => (Number(p.sizeKg) ? p.sizeKg + ' กก.' : '') + (p.unit ? (Number(p.sizeKg) ? ' / ' : '') + p.unit : '');
+  const VSEL = {}; // ขนาดที่เลือกไว้ของแต่ละชื่อ
+
+  /** จัดกลุ่มตามชื่อ (เรียงตามลำดับสินค้าเดิม) ภายในกลุ่มเรียงน้ำหนักน้อย → มาก */
+  function groupsOf(list) {
+    const m = new Map();
+    list.forEach((p) => { const k = gkey(p); if (!m.has(k)) m.set(k, []); m.get(k).push(p); });
+    return [...m.values()].map((vs) => vs.sort((a, b) => (Number(a.sizeKg) - Number(b.sizeKg)) || String(a.unit).localeCompare(String(b.unit), 'th')));
+  }
+  const countGroups = (list) => new Set(list.map(gkey)).size;
+
+  function selectedVariant(vs) {
+    const k = gkey(vs[0]);
+    return vs.find((p) => p.id === VSEL[k]) || vs.find((p) => cart.items[p.id] > 0) || vs[0];
+  }
+
+  /** การ์ดของกลุ่ม — ถ้ามีขนาดเดียวจะหน้าตาเหมือนการ์ดสินค้าปกติ */
+  function prodCard(vs) {
+    if (vs.length === 1) return prodRow(vs[0], vs);
+    const p = selectedVariant(vs);
+    const inCart = vs.filter((v) => cart.items[v.id] > 0);
+    const img = (p.image ? p : vs.find((v) => v.image) || p).image;
+    const chips = vs.map((v) => {
+      const q = cart.items[v.id] || 0;
+      return '<button type="button" class="vchip" data-act="variant" data-id="' + esc(v.id) + '" aria-pressed="' + (v.id === p.id) + '">' +
+        '<span class="vchip-kg">' + esc(Number(v.sizeKg) ? v.sizeKg + ' กก.' : v.unit) + '</span>' +
+        (Number(v.sizeKg) ? '<span class="vchip-unit">' + esc(v.unit) + '</span>' : '') +
+        (q ? '<b class="vchip-n" aria-label="เลือกแล้ว ' + q + ' ' + esc(v.unit) + '">' + q + '</b>' : '') + '</button>';
+    }).join('');
+    return '<article class="prod' + (inCart.length ? ' is-on' : '') + '" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '">' +
+      '<img class="prod-img" src="' + esc(R.imgUrl(img)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
+      '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
+      '<div class="prod-size">มี ' + vs.length + ' ขนาด</div></div>' +
+      '<div class="variants"><div class="variants-label">เลือกขนาด / หน่วย</div><div class="vchips" role="group" aria-label="ขนาดของ' + esc(p.name) + '">' + chips + '</div></div>' +
+      qtyControl(p) + '</article>';
+  }
+
+  function qtyControl(p) {
+    const qty = cart.items[p.id] || 0;
+    return '<div class="prod-qty">' + (qty
+      ? '<div class="stepper" role="group" aria-label="จำนวน' + esc(p.name + ' ' + variantLabel(p)) + '">' +
+        '<button type="button" class="st-minus" data-act="dec" data-id="' + esc(p.id) + '" aria-label="ลดจำนวน">' + icon('minus') + '</button>' +
+        '<button type="button" class="st-qty" data-act="qty" data-id="' + esc(p.id) + '" aria-label="พิมพ์จำนวน ตอนนี้ ' + qty + ' ' + esc(p.unit) + '">' + qty + '<small>' + esc(p.unit) + '</small></button>' +
+        '<button type="button" class="st-plus" data-act="inc" data-id="' + esc(p.id) + '" aria-label="เพิ่มจำนวน">' + icon('plus') + '</button></div>'
+      : '<button type="button" class="btn btn-ghost btn-block" data-act="inc" data-id="' + esc(p.id) + '">' + icon('plus') + ' เลือก' + esc(p.unit) + 'ละ ' + p.sizeKg + ' กก.</button>') +
+      '</div>';
+  }
+
+  /** วาดการ์ดที่มีสินค้า id นี้ใหม่ (หลังเปลี่ยนจำนวน/ขนาด) */
+  function redrawCard(id) {
+    const el = document.querySelector('.prod[data-ids~="' + CSS.escape(id) + '"]');
+    if (!el) return null;
+    const p = productById(id);
+    const vs = groupsOf(filtered()).find((g) => g.some((v) => v.id === id)) || [p];
+    el.outerHTML = prodCard(vs);
+    return document.querySelector('.prod[data-ids~="' + CSS.escape(id) + '"]');
   }
 
   /** อัปเดตเฉพาะรายการข้าวและปุ่มกรอง — ช่องค้นหาไม่หลุดโฟกัสระหว่างพิมพ์ */
@@ -338,17 +399,11 @@
 
   function prodRow(p) {
     const qty = cart.items[p.id] || 0;
-    return '<article class="prod' + (qty ? ' is-on' : '') + '" id="prod-' + esc(p.id) + '">' +
+    return '<article class="prod' + (qty ? ' is-on' : '') + '" data-ids="' + esc(p.id) + '">' +
       '<img class="prod-img" src="' + esc(R.imgUrl(p.image)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
-      '<div><div class="prod-name">' + esc(p.name) + '</div><div class="prod-detail">' + esc(p.detail) + '</div>' +
+      '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
       '<div class="prod-size">' + esc(p.unit) + 'ละ ' + p.sizeKg + ' กิโลกรัม</div></div>' +
-      '<div class="prod-qty">' + (qty
-        ? '<div class="stepper" role="group" aria-label="จำนวน' + esc(p.name) + '">' +
-          '<button type="button" class="st-minus" data-act="dec" data-id="' + esc(p.id) + '" aria-label="ลดจำนวน">' + icon('minus') + '</button>' +
-          '<button type="button" class="st-qty" data-act="qty" data-id="' + esc(p.id) + '" aria-label="พิมพ์จำนวน ตอนนี้ ' + qty + ' ' + esc(p.unit) + '">' + qty + '<small>' + esc(p.unit) + '</small></button>' +
-          '<button type="button" class="st-plus" data-act="inc" data-id="' + esc(p.id) + '" aria-label="เพิ่มจำนวน">' + icon('plus') + '</button></div>'
-        : '<button type="button" class="btn btn-ghost btn-block" data-act="inc" data-id="' + esc(p.id) + '">' + icon('plus') + ' เลือกข้าวนี้</button>') +
-      '</div></article>';
+      qtyControl(p) + '</article>';
   }
 
   function shopBar() {
@@ -363,13 +418,9 @@
     n = Math.max(0, Math.min(9999, Math.floor(Number(n) || 0)));
     if (n) cart.items[id] = n; else delete cart.items[id];
     saveCart();
-    const p = productById(id);
-    const el = document.getElementById('prod-' + id);
-    if (p && el) {
-      el.outerHTML = prodRow(p);
-      const btn = document.querySelector('#prod-' + CSS.escape(id) + ' [data-act="' + (n ? 'inc' : 'inc') + '"]');
-      if (btn) btn.focus({ preventScroll: true });
-    }
+    const card = redrawCard(id);
+    const btn = card && card.querySelector('[data-act="inc"][data-id="' + CSS.escape(id) + '"]');
+    if (btn) btn.focus({ preventScroll: true });
     const bar = document.querySelector('.actionbar-in');
     if (bar) bar.innerHTML = shopBar();
   }
@@ -845,6 +896,11 @@
         break;
       }
       case 'fsheet': openFilterSheet(el.dataset.k); break;
+      case 'variant': {
+        const v = productById(id);
+        if (v) { VSEL[gkey(v)] = id; const card = redrawCard(id); const b = card && card.querySelector('.vchip[data-id="' + CSS.escape(id) + '"]'); if (b) b.focus({ preventScroll: true }); }
+        break;
+      }
       case 'funset': F[el.dataset.k] = ''; refreshShop(); break;
       case 'filter-clear': {
         F.q = ''; F.cat = ''; F.unit = ''; F.size = '';
