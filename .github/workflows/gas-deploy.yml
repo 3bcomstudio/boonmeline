@@ -30,9 +30,10 @@ jobs:
           SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
           DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
         run: |
-          npm install -g @google/clasp@2.4.2
+          npm install -g @google/clasp@3.3.0
           echo "$CLASPRC_JSON" > ~/.clasprc.json
           cd gas
           echo "{\"scriptId\":\"$SCRIPT_ID\",\"rootDir\":\".\"}" > .clasp.json
           clasp push --force
-          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7}"
+          # อัปเดต Web App เดิมเป็นเวอร์ชันใหม่ (URL /exec เดิม หน้าเว็บไม่ต้องแก้)
+          clasp update-deployment "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7}"

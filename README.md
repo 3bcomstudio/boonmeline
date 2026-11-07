@@ -10,6 +10,7 @@
 ## ทำอะไรได้บ้าง
 
 **ลูกค้า (เปิดใน LINE)**
+- ค้นหาข้าวด้วยชื่อหรือน้ำหนัก (เช่น "หอมมะลิ", "5 กก.", "กระสอบ") และกดกรองตาม **หมวด / หน่วย / น้ำหนัก** ได้ (ปุ่มกรองแสดงเมื่อมีตัวเลือกตั้งแต่ 2 แบบขึ้นไป)
 - ลงทะเบียนครั้งเดียว: ชื่อ เบอร์โทร ที่อยู่ ปุ่ม "ใช้ตำแหน่งที่อยู่ตอนนี้" และวัตถุประสงค์ที่ซื้อเป็นประจำ
 - สั่งข้าว 4 ขั้น: เลือกข้าวและจำนวน → ซื้อไปทำอะไร → ส่งถึงที่หรือมารับเอง + วันที่ต้องการ → ตรวจใบสั่งข้าวแล้วกดส่ง
 - ได้ใบแจ้งราคาในแชท LINE → กดยืนยัน → เลือกจ่ายด้วย QR พร้อมเพย์ (สร้างอัตโนมัติตามยอด) หรือเงินสดปลายทาง → ส่งรูปสลิป
@@ -72,12 +73,13 @@ rice-line-oa/
 │   ├── js/admin.js         หน้าแอดมิน
 │   ├── js/demo.js          เซิร์ฟเวอร์จำลองสำหรับโหมดทดลอง
 │   ├── fonts/              Sarabun (ฝังในโปรเจกต์ โหลดเร็วใน LINE)
-│   └── assets/products/    รูปข้าว 10 ยี่ห้อ
+│   └── assets/             โลโก้ร้าน + รูปแทนเมื่อสินค้าไม่มีรูป
 ├── gas/                    ← Backend (Google Apps Script)
 │   ├── Code.gs             API ทั้งหมด + ตรวจ LIFF token
 │   ├── Line.gs             Flex Message, push/reply, webhook
 │   ├── Db.gs               อ่าน/เขียน Google Sheets
 │   ├── Setup.gs            setup() สร้างชีต + ข้อมูลตัวอย่าง
+│   ├── Zort.gs             ดึงสินค้าข้าวจาก ZORT (ราคา/สต็อก) ลงแท็บ Products
 │   └── appsscript.json
 └── .github/workflows/
     ├── pages.yml           deploy web/ ขึ้น GitHub Pages อัตโนมัติ
@@ -101,9 +103,9 @@ python3 -m http.server 8080      # หรือ npx serve .
 ### 1. Google Sheets + Apps Script
 
 1. สร้าง Google Sheet ใหม่ → เมนู **ส่วนขยาย → Apps Script**
-2. สร้างไฟล์ `Code.gs`, `Line.gs`, `Db.gs`, `Setup.gs` แล้ววางโค้ดจากโฟลเดอร์ `gas/` (หรือใช้ clasp ดูด้านล่าง)
+2. สร้างไฟล์ `Code.gs`, `Line.gs`, `Db.gs`, `Setup.gs`, `Zort.gs` แล้ววางโค้ดจากโฟลเดอร์ `gas/` (หรือใช้ clasp ดูด้านล่าง)
 3. ในหน้า Project Settings ติ๊ก "Show appsscript.json" แล้ววางเนื้อหาจาก `gas/appsscript.json`
-4. เลือกฟังก์ชัน `setup` แล้วกด **Run** → อนุญาตสิทธิ์ → ระบบสร้างแท็บ Orders, Customers, Products, Settings, Admins พร้อมข้าว 10 รายการ
+4. เลือกฟังก์ชัน `setup` แล้วกด **Run** → อนุญาตสิทธิ์ → ระบบสร้างแท็บ Orders, Customers, Products, Settings, Admins (แท็บ Products ว่างไว้ ข้าวทั้งหมดดึงจาก ZORT ในขั้นที่ 7)
    ดู **รหัสลงทะเบียนแอดมิน** ใน Execution log
 5. **Deploy → New deployment → Web app**
    - Execute as: **Me**
@@ -164,10 +166,95 @@ git push -u origin main
 ใน LINE OA Manager → ริชเมนู สร้างปุ่ม "สั่งข้าวสาร" ลิงก์ไปที่ `https://liff.line.me/<LIFF_ID>` (แนะนำปุ่มใหญ่เต็มแถว และปุ่ม "โทรหาร้าน")
 พิมพ์ในแชทได้ด้วย: `สั่งข้าว` เพื่อเปิดเมนู, `สถานะ` เพื่อดูคำสั่งซื้อล่าสุด
 
+### 7. ดึงข้อมูลข้าวจาก ZORT (จำเป็น)
+
+ข้าวทุกรายการในระบบมาจาก [ZORT](https://www.zortout.com) **เพียงแหล่งเดียว** ทั้งชื่อ, SKU, ราคาขาย, สต็อกพร้อมขาย, รูป และสถานะเปิด/ปิดขาย ทุกครั้งที่ซิงก์ แท็บ `Products` จะถูกเขียนใหม่ทั้งแท็บ
+ถ้าจะเพิ่ม ลบ หรือแก้ข้าว ให้ทำใน ZORT ถ้าแก้ในชีต ค่าจะถูกทับในการซิงก์ครั้งถัดไป (โค้ดอยู่ที่ `gas/Zort.gs`)
+
+```mermaid
+flowchart LR
+  Z[(ZORT<br>open-api.zortout.com/v4)] -->|GET Product/GetProducts<br>header: storename, apikey, apisecret| G[Apps Script<br>syncZortProducts]
+  G -->|เขียนใหม่ทั้งแท็บ| P[(แท็บ Products)]
+  P --> W[หน้าลูกค้า / หน้าแอดมิน]
+  T[Trigger ทุก 1 ชม.] --> G
+  A[ปุ่ม ดึงสินค้าจาก ZORT<br>หน้าแอดมิน] --> G
+```
+
+**7.1 ขอ API Key จาก ZORT**
+1. เข้าสู่ระบบ ZORT ด้วยบัญชีเจ้าของร้าน
+2. ไปที่ **Setting (ตั้งค่า) → Integration (เชื่อมต่อ) → เพิ่มการเชื่อมต่อ → ZORT Connect → เลือกประเภท ZORT API** → เลือกคลังสินค้า → กด **Generate** (ตามคู่มือ [How to Use ZORT API](https://zortout.com/en?p=47292) ชื่อเมนูภาษาไทยอาจต่างเล็กน้อย ถ้าไม่เจอให้ติดต่อ support@zortout.com) แล้วคัดลอก 3 ค่า
+   - **storename** ชื่อร้านในระบบ ZORT
+   - **apikey**
+   - **apisecret**
+3. ทั้ง 3 ค่านี้ใช้แทนรหัสผ่านร้าน ห้ามใส่ในชีต ใน `web/` หรือ push ขึ้น GitHub
+
+**7.2 ใส่ค่าใน Apps Script**: Project Settings → Script properties
+
+| Key | ค่า |
+|---|---|
+| `ZORT_STORENAME` | storename |
+| `ZORT_APIKEY` | apikey |
+| `ZORT_APISECRET` | apisecret |
+
+อัปโหลดไฟล์ `gas/Zort.gs` เพิ่มเข้าโปรเจกต์ Apps Script แล้วรัน `setup()` อีกครั้ง ระบบจะเพิ่มคอลัมน์ `sku`, `zortId`, `stock`, `syncedAt` ในแท็บ Products และเพิ่มค่า `ZORT_*` ในแท็บ Settings (ข้อมูลลูกค้าและคำสั่งซื้อเดิมไม่หาย)
+
+**7.3 ทดสอบและเลือกเฉพาะสินค้าข้าว**: รันทีละฟังก์ชันแล้วดู Execution log
+1. `testZort` ถ้าเชื่อมต่อได้ จะขึ้นจำนวนสินค้าทั้งร้านและตัวอย่าง 5 รายการ
+2. `zortListCategories` แสดงหมวดสินค้าพร้อม id นำ id ของหมวดข้าวไปใส่ `ZORT_CATEGORY_IDS` ในแท็บ Settings (หลายหมวดให้คั่นด้วย `,`)
+   ถ้าไม่ได้แบ่งหมวดไว้ ให้ใช้ `ZORT_KEYWORD` (ค่าเริ่มต้นคือ `ข้าว`) ระบบเลือกสินค้าที่ชื่อ หมวด หรือ SKU มีคำนี้ คั่นหลายคำด้วย `,`
+3. `zortPreview` แสดงรายการที่จะดึง โดยยังไม่เขียนลงชีต
+4. `syncZortProducts` ดึงข้อมูลจริง: **ข้าวเดิมในชีตที่ไม่ได้มาจาก ZORT (เช่น p01–p10) จะถูกลบ** แล้วแทนด้วยรายการจาก ZORT
+5. `installZortTrigger` ตั้งให้ซิงก์เองทุก 1 ชั่วโมง (`removeZortTrigger` ใช้ยกเลิก)
+
+หลังตั้งค่าครบ หน้าแอดมินจะมีปุ่ม **"ดึงสินค้าจาก ZORT"** ให้กดซิงก์ได้ทันที
+
+**กฎการซิงก์**
+
+| ข้อมูล | พฤติกรรม |
+|---|---|
+| `id` | `z<id ใน ZORT>` เช่น `z1234` |
+| `name`, `sku`, `price`, `image`, `unit`, `detail` | จาก ZORT ทุกครั้ง (`sellprice` = ราคาปลีก, `description` หรือชื่อหมวด = รายละเอียด) |
+| `sizeKg` | อ่านจากชื่อสินค้า เช่น "ข้าวหอมมะลิ 5 กก." ได้ 5 แล้วตัดคำว่า "5 กก." ออกจากชื่อ (หน้าเว็บและ LINE ต่อท้ายขนาดให้เอง) ถ้าชื่อไม่มีขนาด จะใช้น้ำหนักในหน่วยกรัมใน ZORT แทน |
+| `category` | ชื่อหมวดสินค้าใน ZORT ใช้เป็นปุ่มกรอง "หมวด" ในหน้าเลือกข้าว |
+| `stock` | ใช้ `availablestock` (สต็อกพร้อมขาย) ถ้าตั้ง `ZORT_WAREHOUSE_CODE` จะใช้สต็อกของคลังนั้น |
+| `active` | ดึงเฉพาะสินค้าที่เปิดใช้งานใน ZORT ถ้าจะปิดขายข้าวรายการไหน ให้ปิดใน ZORT |
+| `priceWholesale`, `sort` | ZORT ไม่มีข้อมูลนี้ ระบบจึงเก็บค่าที่ร้านใส่ในชีตไว้ให้ (ใช้ `zortId` เดิมจับคู่) |
+| ข้าวที่ไม่อยู่ใน ZORT | ถูกลบออกจากแท็บ Products (คำสั่งซื้อเก่ายังแสดงชื่อข้าวเดิมได้ตามปกติ) |
+| ดึงไม่สำเร็จ / ได้ 0 รายการ | ไม่แตะชีตเลย ข้าวเดิมยังอยู่ กันรายการข้าวหายหมดเพราะเน็ตล่มหรือตั้งค่าผิด |
+| สินค้าประเภทบริการ (`producttype` = 1) | ไม่ดึงมา |
+| `ZORT_HIDE_OUT_OF_STOCK` = TRUE | ข้าวที่สต็อกเหลือ 0 จะไม่แสดงในหน้าลูกค้าและสั่งซื้อไม่ได้ |
+
+**API ของ ZORT ที่ใช้** ([เอกสาร](https://developers.zortout.com/api-reference/product))
+
+```http
+GET https://open-api.zortout.com/v4/Product/GetProducts?keyword=ข้าว&activestatus=1&page=1&limit=500
+storename: <storename>
+apikey: <apikey>
+apisecret: <apisecret>
+```
+- พารามิเตอร์ที่ใช้: `categoryid`, `keyword`, `activestatus=1`, `warehousecode`, `page`, `limit` (สูงสุด 500 ต่อหน้า ระบบวนดึงทุกหน้าให้เอง)
+- ฟิลด์ที่ใช้จากผลลัพธ์: `list[].id, sku, name, description, sellprice, availablestock, unittext, imagepath, weight, category, producttype, active` และ `count`
+- `GET Product/GetCategorys` (ZORT สะกดแบบนี้) ใช้ดูรายชื่อหมวด
+- ทดสอบด้วย curl ได้:
+  ```bash
+  curl -H "storename: XXX" -H "apikey: XXX" -H "apisecret: XXX" \
+    "https://open-api.zortout.com/v4/Product/GetProducts?page=1&limit=5"
+  ```
+
+**แก้ปัญหา ZORT**
+
+| อาการ | วิธีแก้ |
+|---|---|
+| `ZORT ปฏิเสธการเชื่อมต่อ (HTTP 401/403)` | storename / apikey / apisecret ผิด หรือมีช่องว่างติดมาตอนคัดลอก |
+| `ZORT ตอบกลับ error 100` | ส่งพารามิเตอร์ผิด เช่น `ZORT_CATEGORY_IDS` ไม่ใช่ตัวเลข ให้รัน `zortListCategories` ดูใหม่ |
+| ดึงได้ 0 รายการ | หมวดหรือคำค้นไม่ตรง ให้ลองรัน `zortPreview` หลังล้างค่า `ZORT_CATEGORY_IDS` |
+| แก้ราคา/ชื่อในชีตแล้วกลับเป็นค่าเดิม | ระบบใช้ข้อมูลจาก ZORT อย่างเดียว ให้แก้ใน ZORT (ยกเว้น `priceWholesale` และ `sort` ที่แก้ในชีตได้) |
+| ขนาดถุงขึ้น 0 กก. | ใส่ขนาดในชื่อสินค้าใน ZORT เช่น "5 กก." หรือใส่น้ำหนัก (กรัม) ในหน้าสินค้า ZORT |
+| ไม่เห็นปุ่ม "ดึงสินค้าจาก ZORT" | ยังตั้ง Script properties ไม่ครบ 3 ค่า หรือยังไม่ได้ Deploy เป็น New version |
+
 ## ปรับแต่ง
 
-- **ข้าว/ราคา** แท็บ `Products`: `price` = ราคาปลีก, `priceWholesale` = ราคาส่ง (ใช้กับลูกค้าร้านอาหาร/ขายส่ง), `active` = FALSE เพื่อซ่อน, `image` ใส่ path ใน `web/assets/products/` หรือ URL รูป
-  *ราคาที่ใส่มาเป็นตัวอย่าง กรุณาแก้ให้ตรงกับร้าน*
+- **ข้าว/ราคา** แก้ที่ ZORT แล้วกด "ดึงสินค้าจาก ZORT" ในหน้าแอดมิน (หรือรอซิงก์อัตโนมัติ) ในชีตแก้ได้เฉพาะ `priceWholesale` = ราคาส่ง (ใช้กับลูกค้าร้านอาหาร/ขายส่ง ถ้าว่างจะใช้ราคาปลีก) และ `sort` = ลำดับที่แสดง
 - **ร้าน** แท็บ `Settings`: ชื่อร้าน เบอร์โทร ที่อยู่ เวลาทำการ พิกัดร้าน (`SHOP_LAT/LNG` ใช้คำนวณระยะทาง), พร้อมเพย์, ข้อมูลบัญชี, รับเงินสดปลายทาง, สูตรค่าส่งแนะนำ (`SHIP_BASE`, `SHIP_PER_KM`, `FREE_SHIP_BAGS`)
 - แก้ชีตแล้วมีผลภายใน 1 นาที (หรือรัน `clearCache` เพื่อให้มีผลทันที)
 - **สี/ฟอนต์** อยู่ที่ `web/css/base.css` ส่วน `:root`
@@ -192,14 +279,22 @@ git push -u origin main
 - Apps Script อ่าน header `X-Line-Signature` ไม่ได้ webhook จึงทำแค่ **ตอบกลับ** (reply) ไม่แก้ข้อมูลใด ๆ
 - รูปสลิปเก็บใน Google Drive ของเจ้าของสคริปต์ แบบส่วนตัว — แชร์โฟลเดอร์ให้แอดมินคนอื่นถ้าต้องการให้เปิดดูได้
 
-## อัปเดต Apps Script จาก GitHub (ไม่บังคับ)
+## อัปเดต Apps Script อัตโนมัติจาก GitHub
 
-แก้โค้ดใน Apps Script แล้วต้อง **Deploy → Manage deployments → แก้ไข → Version: New version** (URL เดิม)
-หรือให้ GitHub ทำให้อัตโนมัติด้วย `gas-deploy.yml`:
+push โค้ดใน `gas/` ขึ้น `main` แล้ว workflow `gas-deploy.yml` จะ `clasp push` และอัปเดต Web App เดิมเป็นเวอร์ชันใหม่ให้เอง (URL `/exec` เดิม หน้าเว็บไม่ต้องแก้)
+ส่วน `web/` deploy ขึ้น GitHub Pages ด้วย `pages.yml` อยู่แล้ว — push ครั้งเดียวได้ทั้งสองฝั่ง
 
-1. เปิด Apps Script API ที่ https://script.google.com/home/usersettings
-2. บนเครื่องตัวเอง: `npm i -g @google/clasp@2.4.2 && clasp login` แล้วคัดลอกเนื้อหา `~/.clasprc.json`
-3. GitHub → Settings → Secrets → Actions เพิ่ม `CLASPRC_JSON`, `SCRIPT_ID` (จาก Project Settings), `DEPLOYMENT_ID` (จาก Manage deployments)
+ตั้งค่าครั้งเดียว:
+1. เปิด **Google Apps Script API** ที่ https://script.google.com/home/usersettings (ด้วยบัญชี Google ที่เป็นเจ้าของ Sheet)
+2. บนเครื่องตัวเอง: `npm i -g @google/clasp@3.3.0` แล้ว `clasp login` ด้วยบัญชีเดียวกัน → คัดลอกเนื้อหาไฟล์ `~/.clasprc.json` (Windows: `C:\Users\<ชื่อ>\.clasprc.json`)
+3. หาค่า 2 ค่าจาก Apps Script ที่ผูกกับ Sheet (Sheet → ส่วนขยาย → Apps Script)
+   - `SCRIPT_ID`: ⚙ Project Settings → **Script ID**
+   - `DEPLOYMENT_ID`: Deploy → Manage deployments → **Deployment ID** ของ Web App (คือส่วน `AKfycb…` ใน `API_URL` ของ `web/config.js`)
+4. GitHub repo → Settings → Secrets and variables → Actions → **New repository secret** เพิ่ม `CLASPRC_JSON`, `SCRIPT_ID`, `DEPLOYMENT_ID`
+5. ทดสอบ: GitHub → Actions → **Deploy Apps Script (clasp)** → Run workflow
+
+> `CLASPRC_JSON` คือสิทธิ์เข้าถึง Google Drive ของบัญชีนั้น — เก็บใน GitHub Secrets เท่านั้น ห้าม commit
+> ถ้ายังไม่ตั้ง secrets workflow จะข้ามขั้นตอนนี้เฉย ๆ (ไม่ error) — ต้องวางโค้ดใน Apps Script แล้ว Deploy → New version เอง
 
 ## แก้ปัญหาที่พบบ่อย
 

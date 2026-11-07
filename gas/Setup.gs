@@ -22,20 +22,10 @@ const DEFAULT_SETTINGS = [
   ['SHIP_PER_KM', '0', 'ค่าส่งต่อกิโลเมตร (บาท) — ใช้เป็นค่าแนะนำ'],
   ['FREE_SHIP_BAGS', '0', 'ส่งฟรีเมื่อสั่งครบกี่ถุง (0 = ไม่ใช้)'],
   ['ADMIN_NOTIFY', 'TRUE', 'TRUE = แจ้งเตือนแอดมินทาง LINE เมื่อมีคำสั่งซื้อใหม่ (ใช้โควตาข้อความ)'],
-];
-
-/** ราคาตัวอย่างเท่านั้น — แก้ในแท็บ Products ให้ตรงกับราคาจริงของร้าน */
-const DEFAULT_PRODUCTS = [
-  ['p01', 'ตราฉัตรทอง', 'ข้าวหอมมะลิแท้ 100%', 5, 'ถุง', 245, 225, 'assets/products/chatthong.jpg', true, 1],
-  ['p02', 'ตราหงษ์ทอง', 'ข้าวหอมมะลิ 100%', 5, 'ถุง', 240, 220, 'assets/products/hongthong.jpg', true, 2],
-  ['p03', 'มาบุญครอง', 'ข้าวหอมมะลิ 100%', 5, 'ถุง', 230, 210, 'assets/products/mahboonkrong.jpg', true, 3],
-  ['p04', 'ตราเบญจรงค์', 'ข้าวขาวหอมมะลิ ชาววัง', 5, 'ถุง', 255, 235, 'assets/products/benjarong.jpg', true, 4],
-  ['p05', 'ตราพนมรุ้ง', 'ข้าวขาวหอมมะลิ 100%', 5, 'ถุง', 225, 205, 'assets/products/phanomrung.jpg', true, 5],
-  ['p06', 'ตราปิ่นเงิน', 'ข้าวขาวหอมมะลิ 100%', 5, 'ถุง', 215, 195, 'assets/products/pinngoen.jpg', true, 6],
-  ['p07', 'ตราแสนดี', 'ข้าวขาวหอมมะลิแท้ 100%', 5, 'ถุง', 210, 190, 'assets/products/saendee.jpg', true, 7],
-  ['p08', 'ตราธรรม', 'ข้าวหอมใหม่ คัดพิเศษ', 5, 'ถุง', 220, 200, 'assets/products/tham.jpg', true, 8],
-  ['p09', 'ตราไดโนเสาร์', 'ข้าวหอมมะลิ 100%', 15, 'กระสอบ', 590, 550, 'assets/products/dinosaur.jpg', true, 9],
-  ['p10', 'ตราเพชร 101', 'ข้าวหอมมะลิแท้ 100% ทุ่งกุลาร้องไห้', 15, 'กระสอบ', 650, 610, 'assets/products/diamond101.jpg', true, 10],
+  ['ZORT_CATEGORY_IDS', '', 'ZORT: id หมวดสินค้าข้าว คั่นด้วย , (รัน zortListCategories เพื่อดู id) — ว่าง = ใช้คำค้นแทน'],
+  ['ZORT_KEYWORD', 'ข้าว', 'ZORT: เลือกสินค้าที่ชื่อ/หมวด/SKU มีคำนี้ (คั่นหลายคำด้วย ,) ใช้เมื่อไม่ได้ระบุหมวด — ว่างทั้งคู่ = ดึงทั้งร้าน'],
+  ['ZORT_WAREHOUSE_CODE', '', 'ZORT: รหัสคลังที่ใช้ดูสต็อก (ว่าง = รวมทุกคลัง)'],
+  ['ZORT_HIDE_OUT_OF_STOCK', 'FALSE', 'ZORT: TRUE = ซ่อนข้าวที่สต็อกหมดจากหน้าลูกค้า'],
 ];
 
 function setup() {
@@ -60,12 +50,9 @@ function setup() {
   DEFAULT_SETTINGS.filter(function (r) { return !have[r[0]]; }).forEach(function (r) {
     settingsSh.appendRow([r[0], cellValue_(r[1]), r[2]]);
   });
+  fixShopName();
 
-  // Products
-  const prodSh = ss.getSheetByName('Products');
-  if (prodSh.getLastRow() < 2) {
-    prodSh.getRange(2, 1, DEFAULT_PRODUCTS.length, DEFAULT_PRODUCTS[0].length).setValues(DEFAULT_PRODUCTS);
-  }
+  // Products — ไม่มีข้าวตั้งต้น ข้อมูลข้าวมาจาก ZORT เท่านั้น (รัน syncZortProducts หลังตั้งค่า ZORT)
 
   if (!props.getProperty('ADMIN_SETUP_CODE')) {
     props.setProperty('ADMIN_SETUP_CODE', String(Math.floor(100000 + Math.random() * 900000)));
@@ -76,6 +63,11 @@ function setup() {
   console.log('✅ ติดตั้งเรียบร้อย: ' + ss.getUrl());
   console.log('🔑 รหัสลงทะเบียนแอดมิน (ADMIN_SETUP_CODE): ' + props.getProperty('ADMIN_SETUP_CODE'));
   checkConfig();
+  if (zortConfigured_()) {
+    try { syncZortProducts(); console.log('✅ ดึงข้าวจาก ZORT แล้ว'); } catch (err) { console.log('⚠️  ดึงข้าวจาก ZORT ไม่สำเร็จ: ' + err.message); }
+  } else {
+    console.log('⚠️  ยังไม่มีข้าวในระบบ — ตั้งค่า ZORT_STORENAME / ZORT_APIKEY / ZORT_APISECRET แล้วรัน syncZortProducts');
+  }
 }
 
 function ensureSheet_(ss, name, cols) {
@@ -91,6 +83,29 @@ function ensureSheet_(ss, name, cols) {
   if (name === 'Orders') sh.setFrozenColumns(1);
 }
 
+/**
+ * เปลี่ยนชื่อร้านเดิม "ร้านข้าวหอม" (ค่าตั้งต้นเวอร์ชันแรก) เป็น "หจก.บุญมีหาดใหญ่" ในแท็บ Settings
+ * รันเดี่ยว ๆ ได้ หรือรันผ่าน setup() — ค่าที่ร้านตั้งเป็นชื่ออื่นแล้วจะไม่ถูกแตะ
+ */
+const OLD_SHOP_NAME = 'ร้านข้าวหอม';
+const NEW_SHOP_NAME = 'หจก.บุญมีหาดใหญ่';
+
+function fixShopName() {
+  let n = 0;
+  readAll_('Settings').forEach(function (r) {
+    const v = String(r.value || '');
+    if (v.indexOf(OLD_SHOP_NAME) >= 0) {
+      updateRow_('Settings', r._row, { value: v.split(OLD_SHOP_NAME).join(NEW_SHOP_NAME) });
+      console.log('✏️  ' + r.key + ': "' + v + '" → "' + v.split(OLD_SHOP_NAME).join(NEW_SHOP_NAME) + '"');
+      n++;
+    }
+  });
+  const ss = ss_();
+  if (ss.getName().indexOf(OLD_SHOP_NAME) >= 0) ss.rename(ss.getName().split(OLD_SHOP_NAME).join(NEW_SHOP_NAME));
+  clearCache();
+  console.log(n ? '✅ เปลี่ยนชื่อร้านแล้ว ' + n + ' ค่า' : 'ไม่พบชื่อ "' + OLD_SHOP_NAME + '" ในแท็บ Settings');
+}
+
 /** ตรวจว่าตั้งค่า Script Properties ครบหรือยัง */
 function checkConfig() {
   const need = {
@@ -98,6 +113,9 @@ function checkConfig() {
     LOGIN_CHANNEL_ID: 'LINE Login channel → Channel ID',
     LIFF_ID: 'LIFF ID ของหน้าลูกค้า',
     ADMIN_URL: '(ไม่บังคับ) ลิงก์หน้าแอดมิน เช่น https://liff.line.me/<ADMIN_LIFF_ID>',
+    ZORT_STORENAME: '(ไม่บังคับ) ZORT → storename',
+    ZORT_APIKEY: '(ไม่บังคับ) ZORT → API Key',
+    ZORT_APISECRET: '(ไม่บังคับ) ZORT → API Secret',
   };
   Object.keys(need).forEach(function (k) {
     console.log((prop_(k) ? '✅ ' : '⚠️  ยังไม่ตั้ง ') + k + ' — ' + need[k]);

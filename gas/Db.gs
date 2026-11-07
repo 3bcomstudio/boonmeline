@@ -25,6 +25,7 @@ const SCHEMA = {
   ],
   Products: [
     'id', 'name', 'detail', 'sizeKg', 'unit', 'price', 'priceWholesale', 'image', 'active', 'sort',
+    'sku', 'zortId', 'stock', 'syncedAt', 'category',   // ← ซิงก์จาก ZORT (ดู Zort.gs)
   ],
   Settings: ['key', 'value', 'note'],
   Admins: ['userId', 'name', 'notify', 'addedAt'],
@@ -138,6 +139,13 @@ function getSettings_() {
   if (hit) return JSON.parse(hit);
   const s = {};
   readAll_('Settings').forEach(function (r) { if (r.key) s[String(r.key).trim()] = r.value; });
+  // ชีตที่สร้างจากเวอร์ชันแรกยังเป็นชื่อ "ร้านข้าวหอม" → เปลี่ยนให้อัตโนมัติครั้งเดียว (ดู fixShopName ใน Setup.gs)
+  if (Object.keys(s).some(function (k) { return String(s[k]).indexOf(OLD_SHOP_NAME) >= 0; })) {
+    try { fixShopName(); } catch (err) { console.error('fixShopName', err); }
+    Object.keys(s).forEach(function (k) {
+      if (typeof s[k] === 'string') s[k] = s[k].split(OLD_SHOP_NAME).join(NEW_SHOP_NAME);
+    });
+  }
   cache.put('settings', JSON.stringify(s), 60);
   return s;
 }
@@ -160,11 +168,18 @@ function getProducts_(activeOnly) {
         image: String(p.image || ''),
         active: truthy_(p.active),
         sort: Number(p.sort) || 999,
+        sku: String(p.sku || ''),
+        zortId: String(p.zortId || ''),
+        category: String(p.category || ''),
+        stock: p.stock === '' || p.stock === undefined ? null : Number(p.stock) || 0,
       };
     }).sort(function (a, b) { return a.sort - b.sort; });
     cache.put('products', JSON.stringify(list), 60);
   }
-  return activeOnly ? list.filter(function (p) { return p.active; }) : list;
+  if (!activeOnly) return list;
+  // ZORT_HIDE_OUT_OF_STOCK = TRUE → ซ่อนข้าวที่ผูกกับ ZORT แล้วสต็อกหมด
+  const hideOos = truthy_(getSettings_().ZORT_HIDE_OUT_OF_STOCK);
+  return list.filter(function (p) { return p.active && !(hideOos && p.zortId && p.stock !== null && p.stock <= 0); });
 }
 
 /** เรียกหลังแก้ชีต Settings/Products ถ้าอยากให้มีผลทันที */

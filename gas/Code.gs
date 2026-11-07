@@ -11,6 +11,7 @@
  *   LIFF_ID                    — LIFF ID หน้าลูกค้า (ใช้สร้างลิงก์ในข้อความ LINE)
  *   ADMIN_URL                  — (ไม่บังคับ) ลิงก์หน้าแอดมิน เช่น https://liff.line.me/<ADMIN_LIFF_ID>
  *   ADMIN_SETUP_CODE           — setup() สร้างให้อัตโนมัติ ใช้ลงทะเบียนแอดมินครั้งแรก
+ *   ZORT_STORENAME / ZORT_APIKEY / ZORT_APISECRET — (ไม่บังคับ) เชื่อมสินค้าจาก ZORT ดู Zort.gs
  */
 
 const APP_VERSION = '1.0.0';
@@ -102,6 +103,7 @@ function route_(req) {
     case 'adminBootstrap': return apiAdminBootstrap_(admin);
     case 'adminQuote': return withLock_(function () { return apiAdminQuote_(admin, req); });
     case 'adminSetStatus': return withLock_(function () { return apiAdminSetStatus_(admin, req); });
+    case 'adminZortSync': return apiAdminZortSync_();
   }
   fail_('bad_action', 'ไม่รู้จักคำสั่ง ' + action);
 }
@@ -414,8 +416,15 @@ function apiAdminBootstrap_(admin) {
     products: getProducts_(false),
     settings: getSettings_(),
     sheetUrl: ss_().getUrl(),
+    zort: zortStatus_(),
     serverTime: new Date().toISOString(),
   };
+}
+
+/** ปุ่ม "ดึงสินค้าจาก ZORT" ในหน้าแอดมิน */
+function apiAdminZortSync_() {
+  const result = syncZortProducts();
+  return { result: result, products: getProducts_(false), zort: zortStatus_() };
 }
 
 function apiAdminQuote_(admin, req) {
