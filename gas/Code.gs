@@ -284,10 +284,16 @@ function apiCreateOrder_(user, o) {
     fail_('invalid', 'กรุณาบอกที่อยู่จัดส่ง หรือกดปุ่ม "ใช้ตำแหน่งที่อยู่ตอนนี้"');
   }
 
+  const settingsNow = getSettings_();
+  const wantDate = clean_(o.wantDate, 40);
+  if (/^เร็วที่สุด/.test(wantDate) && shopOpenNow_(settingsNow) === false) {
+    fail_('shop_closed', 'ตอนนี้ร้านปิดอยู่ กรุณาเลือกรับข้าวพรุ่งนี้ หรือเลือกวันอื่น');
+  }
+
   const waiting = findRows_('Orders', 'userId', user.userId).filter(function (x) { return x.status === 'new'; }).length;
   if (waiting >= 5) fail_('too_many', 'มีคำสั่งซื้อรอร้านแจ้งราคาอยู่ 5 รายการแล้ว กรุณารอร้านติดต่อกลับก่อน');
 
-  const settings = getSettings_();
+  const settings = settingsNow;
   const now = new Date();
   const orderId = nextOrderId_();
   const row = {
@@ -297,7 +303,7 @@ function apiCreateOrder_(user, o) {
     deliveryMethod: method, address: method === 'delivery' ? address : '',
     lat: method === 'delivery' && ll ? ll.lat : '', lng: method === 'delivery' && ll ? ll.lng : '',
     distanceKm: method === 'delivery' && ll ? distanceKm_(settings, ll.lat, ll.lng) : '',
-    wantDate: clean_(o.wantDate, 40), note: clean_(o.note, 500),
+    wantDate: wantDate, note: clean_(o.note, 500),
     itemsText: items.map(function (i) { return i.name + ' ' + i.sizeKg + ' กก. × ' + i.qty + ' ' + i.unit; }).join('\n'),
     totalBags: items.reduce(function (s, i) { return s + i.qty; }, 0),
     totalKg: items.reduce(function (s, i) { return s + i.qty * i.sizeKg; }, 0),
@@ -384,6 +390,34 @@ function slipFolder_() {
   const folder = DriveApp.createFolder('สลิปโอนเงิน — ระบบสั่งข้าว');
   props.setProperty('SLIP_FOLDER_ID', folder.getId());
   return folder;
+}
+
+/**
+ * ร้านเปิดอยู่ตอนนี้ไหม (เวลาไทย) จาก SHOP_HOURS เช่น "วันจันทร์–วันเสาร์ 8.00–17.00 น."
+ * คืน true/false หรือ null ถ้าอ่านเวลาทำการไม่ออก (ไม่บังคับ)
+ */
+function shopOpenNow_(settings) {
+  const t = String(settings.SHOP_HOURS || '');
+  const m = t.match(/(\d{1,2})[.:](\d{2})\s*(?:น\.?)?\s*[-–—ถึง]+\s*(\d{1,2})[.:](\d{2})/);
+  if (!m) return null;
+  const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์'];
+  let days = [0, 1, 2, 3, 4, 5, 6];
+  if (!/ทุกวัน/.test(t)) {
+    const idx = function (name) { for (let i = 0; i < 7; i++) if (name.indexOf(DAYS[i]) >= 0) return i; return -1; };
+    const r = t.match(/(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส\S*|ศุกร์|เสาร์)\s*[-–—ถึง]+\s*(?:วัน)?(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส\S*|ศุกร์|เสาร์)/);
+    if (r) {
+      const a = idx(r[1]), b = idx(r[2]);
+      days = [];
+      for (let i = a; ; i = (i + 1) % 7) { days.push(i); if (i === b || days.length > 7) break; }
+    } else {
+      const listed = DAYS.map(function (d, i) { return t.indexOf(d) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; });
+      if (listed.length) days = listed;
+    }
+  }
+  const now = new Date();
+  const dow = Number(Utilities.formatDate(now, TZ, 'u')) % 7;           // u: 1=จันทร์ … 7=อาทิตย์
+  const mins = Number(Utilities.formatDate(now, TZ, 'H')) * 60 + Number(Utilities.formatDate(now, TZ, 'm'));
+  return days.indexOf(dow) >= 0 && mins >= (+m[1] * 60 + +m[2]) && mins < (+m[3] * 60 + +m[4]);
 }
 
 /* =========================================================

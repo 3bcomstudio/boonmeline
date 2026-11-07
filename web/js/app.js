@@ -50,8 +50,8 @@
   }
   function wantText() {
     if (cart.wantMode === 'tomorrow') {
-      const d = new Date(); d.setDate(d.getDate() + 1);
-      return 'พรุ่งนี้ (' + R.dateTH(d.toISOString()) + ')';
+      const n = nextOpenDay();
+      return n.label + ' (' + R.dateTH(n.date.toISOString()) + ')';
     }
     if (cart.wantMode === 'date' && cart.wantDate) return R.dateTH(cart.wantDate + 'T12:00:00');
     return 'เร็วที่สุด';
@@ -264,6 +264,32 @@
       return { open: false, text: 'ร้านปิดอยู่', sub: 'เปิด' + when + ' ' + hm(hrs.open) + ' · สั่งไว้ก่อนได้เลย' };
     }
     return null;
+  }
+
+  /** ตอนนี้ร้านปิดอยู่ไหม (อ่านเวลาทำการไม่ออก = ถือว่าเปิด ไม่บังคับอะไร) */
+  function closedNow() {
+    const st = shopStatus(new Date());
+    return !!(st && !st.open);
+  }
+  const ymd = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  /** วันนั้นร้านเปิดไหม (อ่านเวลาทำการไม่ออก = เปิด) */
+  function openOn(d) {
+    const hrs = parseHours(S.settings.SHOP_HOURS);
+    return !hrs || hrs.days.indexOf(d.getDay()) >= 0;
+  }
+  /** วันเปิดถัดไปหลังวันนี้ — ปกติคือพรุ่งนี้ ถ้าพรุ่งนี้ร้านหยุดจะเลื่อนไปวันเปิดถัดไป */
+  function nextOpenDay() {
+    const d = new Date(); d.setHours(12, 0, 0, 0);
+    for (let k = 1; k <= 7; k++) {
+      d.setDate(d.getDate() + 1);
+      if (openOn(d)) return { date: new Date(d), label: k === 1 ? 'พรุ่งนี้' : 'วัน' + DAY_TH[d.getDay()] };
+    }
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    return { date: t, label: 'พรุ่งนี้' };
+  }
+  /** นอกเวลาทำการเลือก "เร็วที่สุด" ไม่ได้ → เปลี่ยนเป็นวันเปิดถัดไปให้เอง */
+  function normalizeWant() {
+    if (cart.wantMode === 'asap' && closedNow()) { cart.wantMode = 'tomorrow'; saveCart(); }
   }
 
   function helloCard(first) {
@@ -611,8 +637,14 @@
         (shopMap ? '<p style="margin-top:.6rem"><a href="' + shopMap + '" target="_blank" rel="noopener">' + icon('map') + ' ดูแผนที่ไปร้าน</a></p>' : '') +
         '</div></section>';
     }
-    const chip = (mode, label) => '<button type="button" class="chip" data-act="want" data-id="' + mode + '" aria-pressed="' + (cart.wantMode === mode) + '">' + label + '</button>';
-    const today = new Date(); const minDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    normalizeWant();
+    const closed = closedNow();
+    const status = shopStatus(new Date());
+    const nxt = nextOpenDay();
+    const chip = (mode, label, off) => '<button type="button" class="chip" data-act="want" data-id="' + mode + '" aria-pressed="' + (cart.wantMode === mode) + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
+    const start = new Date(); if (closed) start.setDate(start.getDate() + 1);
+    const minDate = ymd(start);
+    const badDate = cart.wantMode === 'date' && cart.wantDate && !openOn(new Date(cart.wantDate + 'T12:00:00'));
     return {
       back: '#/purpose', top: 'สั่งข้าวสาร',
       body: stepHead(3, 'รับข้าวอย่างไร', '') +
@@ -620,9 +652,16 @@
         tile({ act: 'method', id: 'delivery', icon: 'truck', label: 'ส่งถึงที่', sub: 'ร้านนำข้าวไปส่งให้', on: cart.deliveryMethod === 'delivery' }) +
         tile({ act: 'method', id: 'pickup', icon: 'store', label: 'มารับเองที่ร้าน', sub: 'ไม่มีค่าส่ง', on: cart.deliveryMethod === 'pickup' }) +
         '</div>' + detail +
-        '<section class="section"><h2 class="section-title">อยากได้ข้าววันไหน</h2><div class="chips">' +
-        chip('asap', 'เร็วที่สุด') + chip('tomorrow', 'พรุ่งนี้') + chip('date', 'เลือกวัน') + '</div>' +
-        (cart.wantMode === 'date' ? '<label class="field" style="margin-top:.8rem"><span class="sr-only">วันที่ต้องการ</span><input type="date" class="input" data-bind="wantDate" min="' + minDate + '" value="' + esc(cart.wantDate) + '"></label>' : '') +
+        '<section class="section"><h2 class="section-title">อยากได้ข้าววันไหน</h2>' +
+        (closed ? '<p class="want-note">' + icon('clock') + '<span><b>ตอนนี้ร้านปิดอยู่</b>' + (status ? ' (' + esc(status.sub.split(' · ')[0]) + ')' : '') +
+          ' เลือกรับข้าวได้ตั้งแต่' + (nxt.label === 'พรุ่งนี้' ? 'พรุ่งนี้' : nxt.label) + 'เป็นต้นไป</span></p>' : '') +
+        '<div class="chips">' +
+        chip('asap', closed ? 'เร็วที่สุด (ร้านปิดอยู่)' : 'เร็วที่สุด', closed) +
+        chip('tomorrow', nxt.label + ' ' + nxt.date.getDate() + ' ' + R.dateTH(nxt.date.toISOString()).split(' ')[1]) +
+        chip('date', 'เลือกวัน') + '</div>' +
+        (cart.wantMode === 'date' ? '<label class="field" style="margin-top:.8rem"><span class="sr-only">วันที่ต้องการ</span><input type="date" class="input' + (badDate ? ' is-invalid' : '') + '" data-bind="wantDate" data-rerender="1" min="' + minDate + '" value="' + esc(cart.wantDate) + '">' +
+          (badDate ? '<span class="field-error">ร้านหยุดวัน' + DAY_TH[new Date(cart.wantDate + 'T12:00:00').getDay()] + ' กรุณาเลือกวันอื่น</span>' : '') +
+          (S.settings.SHOP_HOURS ? '<span class="field-hint">ร้านเปิด ' + esc(S.settings.SHOP_HOURS) + '</span>' : '') + '</label>' : '') +
         '</section>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="delivery-next">ไปขั้นต่อไป ' + icon('chevron') + '</button>',
     };
@@ -676,6 +715,12 @@
   }
 
   async function submitOrder() {
+    if (cart.wantMode === 'asap' && closedNow()) {
+      normalizeWant();
+      R.toast('ร้านเพิ่งปิด เปลี่ยนเป็นรับข้าว' + nextOpenDay().label + 'ให้แล้ว ตรวจแล้วกดส่งอีกครั้ง', 'err');
+      render();
+      return;
+    }
     const payload = {
       items: cartLines().map(({ p, qty }) => ({ productId: p.id, qty })),
       purpose: cart.purpose, purposeNote: cart.purposeNote,
@@ -1057,6 +1102,13 @@
           return;
         }
         if (cart.wantMode === 'date' && !cart.wantDate) { R.toast('กรุณาเลือกวันที่ต้องการรับข้าว', 'err'); return; }
+        if (cart.wantMode === 'date') {
+          const d = new Date(cart.wantDate + 'T12:00:00');
+          const min = new Date(); if (closedNow()) min.setDate(min.getDate() + 1);
+          if (ymd(d) < ymd(min)) { R.toast(closedNow() ? 'ตอนนี้ร้านปิดอยู่ กรุณาเลือกตั้งแต่พรุ่งนี้' : 'กรุณาเลือกวันนี้หรือวันถัดไป', 'err'); return; }
+          if (!openOn(d)) { R.toast('ร้านหยุดวันที่เลือก กรุณาเลือกวันอื่น', 'err'); return; }
+        }
+        normalizeWant();
         go('#/review'); break;
       case 'locate': {
         el.disabled = true;
@@ -1109,6 +1161,7 @@
   });
 
   app.addEventListener('change', (e) => {
+    if (e.target.dataset && e.target.dataset.rerender) { render(); return; }
     if (e.target.dataset && e.target.dataset.file === 'slip') uploadSlip(e.target);
   });
 
