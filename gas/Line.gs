@@ -61,8 +61,9 @@ function adminUrl_(orderId) {
   return base + (orderId ? (base.indexOf('?') >= 0 ? '&' : '?') + 'order=' + encodeURIComponent(orderId) : '');
 }
 
+/** ลิงก์โทร — ถ้ามีหลายเบอร์ (คั่นด้วย ,) ใช้เบอร์แรก */
 function telUri_(phone) {
-  const d = String(phone || '').replace(/[^\d+]/g, '');
+  const d = String(phone || '').split(/[,;/|]|และ/)[0].replace(/[^\d+]/g, '');
   return d.length >= 9 ? 'tel:' + d : '';
 }
 

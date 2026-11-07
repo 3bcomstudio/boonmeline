@@ -84,11 +84,20 @@
     return String(s === null || s === undefined ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-  function phoneFmt(p) {
-    const d = String(p || '').replace(/\D/g, '');
+  /** แยกเบอร์หลายเบอร์ เช่น "086-961-3331, 074-244-690" → ['0869613331', '074244690'] */
+  function phoneList(p) {
+    return String(p || '').split(/[,;/|]|\s{2,}|และ/).map((x) => x.replace(/[^\d+]/g, '')).filter((x) => x.length >= 9);
+  }
+  function fmtOne(d) {
     if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
-    if (d.length === 9) return d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5);
+    if (d.length === 9 && d.slice(0, 2) === '02') return d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5);
+    if (d.length === 9) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
     return d;
+  }
+  function phoneFmt(p) {
+    const list = phoneList(p);
+    if (!list.length) return String(p || '').replace(/\D/g, '');
+    return list.map(fmtOne).join(', ');
   }
   function mapUrl(lat, lng) { return lat && lng ? 'https://www.google.com/maps?q=' + lat + ',' + lng : ''; }
   function imgUrl(src) { return src || 'assets/rice-placeholder.svg'; }
@@ -405,7 +414,7 @@
 
   window.Rice = {
     CFG, DEMO, PURPOSES, purposeOf, statusInfo, ADMIN_STATUS,
-    money, dateTH, timeTH, ago, esc, phoneFmt, mapUrl, imgUrl,
+    money, dateTH, timeTH, ago, esc, phoneFmt, phoneList, mapUrl, imgUrl,
     icon, injectIcons, sackLoader, initAuth, relogin, inLineApp, closeWindow, sendChat,
     api, ApiError, toast, modal, confirmBox, busy,
     promptpayPayload, qrDataUrl, resizeImage, getLocation, storage,

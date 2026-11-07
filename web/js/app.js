@@ -33,7 +33,11 @@
   window.addEventListener('hashchange', render);
 
   const shopName = () => S.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่';
-  const telLink = () => 'tel:' + String(S.settings.SHOP_PHONE || '').replace(/[^\d+]/g, '');
+  /** ลิงก์โทรเบอร์แรกของร้าน (เบอร์หลัก) */
+  const telLink = () => 'tel:' + (R.phoneList(S.settings.SHOP_PHONE)[0] || '');
+  const mainPhone = () => R.phoneFmt(R.phoneList(S.settings.SHOP_PHONE)[0] || S.settings.SHOP_PHONE);
+  /** ทุกเบอร์ของร้าน แต่ละเบอร์กดโทรได้ */
+  const phoneLinks = () => R.phoneList(S.settings.SHOP_PHONE).map((d) => '<a href="tel:' + d + '">' + esc(R.phoneFmt(d)) + '</a>').join(', ');
   const productById = (id) => S.products.find((p) => p.id === id);
 
   function cartLines() {
@@ -114,7 +118,7 @@
       '<ul class="sc-info">' +
       (st.SHOP_ADDRESS ? row('store', esc(st.SHOP_ADDRESS) + (map ? ' <a href="' + esc(map) + '" target="_blank" rel="noopener">ดูแผนที่ร้าน</a>' : '')) : '') +
       (st.SHOP_HOURS ? row('clock', 'เปิด ' + esc(st.SHOP_HOURS)) : '') +
-      (st.SHOP_PHONE ? row('phone', '<a href="' + telLink() + '">' + esc(R.phoneFmt(st.SHOP_PHONE)) + '</a>') : '') +
+      (st.SHOP_PHONE ? row('phone', 'โทร ' + phoneLinks()) : '') +
       (st.SHOP_TAX_ID ? row('receipt', 'เลขทะเบียนนิติบุคคล ' + esc(st.SHOP_TAX_ID)) : '') +
       '</ul></section>';
   }
@@ -128,7 +132,7 @@
     return '<aside class="safety' + (compact ? ' compact' : '') + '" aria-label="ข้อควรรู้เพื่อความปลอดภัย">' +
       '<div class="safety-h">' + icon('alert') + '<strong>ข้อควรรู้เพื่อความปลอดภัย</strong></div>' +
       '<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>' +
-      (S.settings.SHOP_PHONE ? '<p>สงสัยอะไร โทรถามร้านได้ที่ <a href="' + telLink() + '">' + esc(R.phoneFmt(S.settings.SHOP_PHONE)) + '</a></p>' : '') +
+      (S.settings.SHOP_PHONE ? '<p>สงสัยอะไร โทรถามร้านได้ที่ ' + phoneLinks() + '</p>' : '') +
       '</aside>';
   }
 
@@ -200,7 +204,7 @@
         menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ข้าวที่สั่งไว้', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูข้าวที่เคยสั่ง และติดตามว่าถึงไหนแล้ว', badge: pending.length }) +
         menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่ส่งข้าว' }) +
         (S.settings.SHOP_PHONE ? '<a class="menu-item call" href="' + telLink() + '"><span class="mi-ic">' + icon('phone') + '</span>' +
-          '<span class="mi-text"><strong>โทรหาร้าน</strong><span class="mi-sub">' + esc(R.phoneFmt(S.settings.SHOP_PHONE)) + (S.settings.SHOP_HOURS ? ' (' + esc(S.settings.SHOP_HOURS) + ')' : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
+          '<span class="mi-text"><strong>โทรหาร้าน</strong><span class="mi-sub">' + esc(mainPhone()) + (S.settings.SHOP_HOURS ? ' · เปิด ' + esc(S.settings.SHOP_HOURS) : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
         '</nav>' +
         '<section class="how"><h2>สั่งข้าวง่าย ๆ 3 ขั้นตอน</h2><ol>' +
         '<li><b>1</b><span>เลือกข้าวและจำนวนที่ต้องการ</span></li>' +
@@ -705,7 +709,7 @@
         billHtml(o, st) + action +
         (o.status !== 'cancelled' ? '<section class="section"><h2 class="section-title">ขั้นตอน</h2>' + timeline(o) + '</section>' : '') +
         '<div class="stack section">' +
-        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' โทรถามร้าน ' + esc(R.phoneFmt(s.SHOP_PHONE)) + '</a>' : '') +
+        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' โทรถามร้าน ' + esc(mainPhone()) + '</a>' : '') +
         (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกการสั่งข้าวนี้</button>' : '') +
         '</div>',
       bar: bar,
@@ -776,7 +780,7 @@
           '<img src="' + qr + '" alt="QR พร้อมเพย์ ยอด ' + money(o.total) + ' บาท" width="300" height="300">' +
           '<div class="payee"><span>ชื่อบัญชีผู้รับเงิน</span><strong>' + esc(payeeName()) + '</strong>' +
           '<small>ก่อนกดยืนยันในแอปธนาคาร ตรวจว่าชื่อผู้รับตรงกับชื่อนี้ ถ้าไม่ตรง อย่าโอน และโทรหาร้าน' +
-          (s.SHOP_PHONE ? ' <a href="' + telLink() + '">' + esc(R.phoneFmt(s.SHOP_PHONE)) + '</a>' : '') + '</small></div>' +
+          (s.SHOP_PHONE ? ' ' + phoneLinks() : '') + '</small></div>' +
           '<div class="qr-help"><strong>วิธีจ่าย</strong><ol>' +
           '<li>กดค้างที่รูป QR แล้วเลือก "บันทึกรูป"</li>' +
           '<li>เปิดแอปธนาคาร เลือก "สแกน" แล้วเลือกรูปที่บันทึกไว้</li>' +

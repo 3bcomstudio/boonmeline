@@ -146,6 +146,12 @@ function getSettings_() {
       if (typeof s[k] === 'string') s[k] = s[k].split(OLD_SHOP_NAME).join(NEW_SHOP_NAME);
     });
   }
+  if (needsShopInfo_(s)) {
+    try { fixShopInfo(); } catch (err) { console.error('fixShopInfo', err); }
+    Object.keys(SHOP_INFO_DEFAULTS).forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(s, k) && SHOP_INFO_DEFAULTS[k].old.indexOf(String(s[k]).trim()) >= 0) s[k] = SHOP_INFO_DEFAULTS[k].value;
+    });
+  }
   cache.put('settings', JSON.stringify(s), 60);
   return s;
 }

@@ -8,9 +8,9 @@
 const DEFAULT_SETTINGS = [
   ['SHOP_NAME', 'หจก.บุญมีหาดใหญ่', 'ชื่อร้าน แสดงบนหน้าเว็บและข้อความ LINE'],
   ['LOGO_URL', 'https://3bcomstudio.github.io/boonmeline/assets/logo.png', 'ลิงก์รูปโลโก้ร้าน (https) แสดงในข้อความต้อนรับใน LINE — เว้นว่างถ้าไม่ต้องการ'],
-  ['SHOP_PHONE', '0812345678', 'เบอร์โทรร้าน (ปุ่ม "โทรหาร้าน")'],
-  ['SHOP_ADDRESS', '', 'ที่อยู่ร้าน สำหรับลูกค้าที่มารับเอง'],
-  ['SHOP_HOURS', 'ทุกวัน 08:00–18:00', 'เวลาทำการ'],
+  ['SHOP_PHONE', '086-961-3331, 074-244-690', 'เบอร์โทรร้าน — หลายเบอร์คั่นด้วย , (ปุ่ม "โทรหาร้าน" โทรเบอร์แรก)'],
+  ['SHOP_ADDRESS', '51 ถนนเชื่อมรัฐ ตำบลหาดใหญ่ อำเภอหาดใหญ่ สงขลา 90110', 'ที่อยู่ร้าน แสดงในหน้าแรก ท้ายหน้า และสำหรับลูกค้าที่มารับเอง'],
+  ['SHOP_HOURS', 'วันจันทร์–วันเสาร์ 8.00–17.00 น.', 'เวลาทำการ'],
   ['SHOP_TAX_ID', '', 'เลขทะเบียนนิติบุคคล / เลขผู้เสียภาษี 13 หลัก (แสดงที่หน้าแรกและท้ายหน้า ให้ลูกค้ามั่นใจว่าเป็นร้านจริง)'],
   ['SHOP_LAT', '', 'ละติจูดร้าน (ใช้คำนวณระยะทาง) เช่น 7.0086'],
   ['SHOP_LNG', '', 'ลองจิจูดร้าน เช่น 100.4747'],
@@ -52,6 +52,7 @@ function setup() {
     settingsSh.appendRow([r[0], cellValue_(r[1]), r[2]]);
   });
   fixShopName();
+  fixShopInfo();
 
   // Products — ไม่มีข้าวตั้งต้น ข้อมูลข้าวมาจาก ZORT เท่านั้น (รัน syncZortProducts หลังตั้งค่า ZORT)
 
@@ -90,6 +91,36 @@ function ensureSheet_(ss, name, cols) {
  */
 const OLD_SHOP_NAME = 'ร้านข้าวหอม';
 const NEW_SHOP_NAME = 'หจก.บุญมีหาดใหญ่';
+
+/**
+ * แทนค่าตัวอย่างจากเวอร์ชันแรกด้วยข้อมูลร้านจริง — แตะเฉพาะช่องที่ยังเป็นค่าตัวอย่างหรือว่าง
+ * (ถ้าร้านแก้เป็นค่าอื่นเองแล้วจะไม่ถูกทับ)
+ */
+const SHOP_INFO_DEFAULTS = {
+  SHOP_PHONE: { old: ['', '0812345678', '812345678'], value: '086-961-3331, 074-244-690' },
+  SHOP_ADDRESS: { old: [''], value: '51 ถนนเชื่อมรัฐ ตำบลหาดใหญ่ อำเภอหาดใหญ่ สงขลา 90110' },
+  SHOP_HOURS: { old: ['', 'ทุกวัน 08:00–18:00'], value: 'วันจันทร์–วันเสาร์ 8.00–17.00 น.' },
+};
+
+function needsShopInfo_(s) {
+  return Object.keys(SHOP_INFO_DEFAULTS).some(function (k) {
+    return Object.prototype.hasOwnProperty.call(s, k) && SHOP_INFO_DEFAULTS[k].old.indexOf(String(s[k]).trim()) >= 0;
+  });
+}
+
+function fixShopInfo() {
+  let n = 0;
+  readAll_('Settings').forEach(function (r) {
+    const d = SHOP_INFO_DEFAULTS[String(r.key).trim()];
+    if (d && d.old.indexOf(String(r.value).trim()) >= 0) {
+      updateRow_('Settings', r._row, { value: d.value });
+      console.log('✏️  ' + r.key + ' → ' + d.value);
+      n++;
+    }
+  });
+  clearCache();
+  console.log(n ? '✅ อัปเดตข้อมูลร้าน ' + n + ' ค่า' : 'ข้อมูลร้านเป็นค่าจริงอยู่แล้ว');
+}
 
 function fixShopName() {
   let n = 0;
