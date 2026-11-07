@@ -14,13 +14,14 @@
 
   const isCodWaiting = (o) => o.status === 'confirmed' && o.payMethod === 'cod';
   const FILTERS = [
-    { id: 'todo', label: 'ต้องทำ', test: (o) => o.status === 'new' || o.status === 'slip' || o.status === 'paid' || isCodWaiting(o), hot: true },
+    { id: 'todo', label: 'ต้องทำ', test: (o) => o.status === 'new' || o.status === 'slip' || o.status === 'paid' || isCodWaiting(o) || o.zortVoidStatus === 'pending', hot: true },
     { id: 'new', label: 'รอแจ้งราคา', test: (o) => o.status === 'new' },
     { id: 'quoted', label: 'รอลูกค้ายืนยัน', test: (o) => o.status === 'quoted' },
     { id: 'pay', label: 'รอชำระ / ตรวจสลิป', test: (o) => o.status === 'slip' || (o.status === 'confirmed' && o.payMethod !== 'cod') },
     { id: 'ship', label: 'รอส่ง / กำลังส่ง', test: (o) => o.status === 'paid' || o.status === 'shipping' || isCodWaiting(o) },
     { id: 'done', label: 'สำเร็จ', test: (o) => o.status === 'done' },
     { id: 'cancelled', label: 'ยกเลิก', test: (o) => o.status === 'cancelled' },
+    { id: 'zortvoid', label: 'รอยกเลิกใน ZORT', test: (o) => o.zortVoidStatus === 'pending', hot: true, onlyIfAny: true },
     { id: 'all', label: 'ทั้งหมด', test: () => true },
   ];
 
@@ -88,7 +89,9 @@
     const mix = {}; month.filter((o) => o.status !== 'cancelled').forEach((o) => { mix[o.purpose] = (mix[o.purpose] || 0) + 1; });
     const totalMix = Object.values(mix).reduce((a, b) => a + b, 0);
     const k = (n, label, cls, f) => '<button type="button" class="kpi' + (cls ? ' ' + cls : '') + '" data-act="filter" data-id="' + f + '"><b>' + n + '</b><span>' + label + '</span></button>';
-    return k(c('new'), 'รอแจ้งราคา', c('new') ? 'hot' : '', 'new') +
+    const zv = A.orders.filter((o) => o.zortVoidStatus === 'pending').length;
+    return (zv ? k(zv, 'รอยกเลิกใน ZORT', 'alarm', 'zortvoid') : '') +
+      k(c('new'), 'รอแจ้งราคา', c('new') ? 'hot' : '', 'new') +
       k(c('slip'), 'รอตรวจสลิป', c('slip') ? 'hot' : '', 'pay') +
       k(ship, 'ต้องจัดส่ง', ship ? 'hot' : '', 'ship') +
       '<div class="kpi money"><b>฿' + money(sales) + '</b><span>ยอดขายเดือนนี้ (' + bags + ' ถุง)</span></div>' +
@@ -100,6 +103,7 @@
   function filters() {
     return FILTERS.map((f) => {
       const n = A.orders.filter(f.test).length;
+      if (f.onlyIfAny && !n && A.filter !== f.id) return '';
       return '<button type="button" class="fchip' + (f.hot && n ? ' hot' : '') + '" data-act="filter" data-id="' + f.id + '" aria-pressed="' + (A.filter === f.id) + '">' + f.label + ' <b>' + n + '</b></button>';
     }).join('');
   }
@@ -118,6 +122,7 @@
     return rows.map((o) =>
       '<button type="button" class="o-row' + (o.orderId === A.sel ? ' active' : '') + (o.status === 'new' ? ' is-new' : '') + '" data-act="open" data-id="' + esc(o.orderId) + '">' +
       '<div class="o-row-top"><b>#' + esc(o.orderId) + '</b>' + statusPill(o) + '</div>' +
+      (o.zortVoidStatus === 'pending' ? '<div class="o-row-flag">' + icon('alert') + 'ต้องไปยกเลิกใน ZORT</div>' : '') +
       '<div class="o-row-name">' + esc(o.fullName || o.lineName) + '</div>' +
       '<div class="o-row-meta"><span>' + ptag(o) + ' ' + o.totalBags + ' ถุง / ' + o.totalKg + ' กก.</span><span>' + (o.total ? '฿' + money(o.total) : R.ago(o.createdAt)) + '</span></div>' +
       '</button>').join('');
@@ -142,6 +147,7 @@
       '<button type="button" class="btn btn-ghost btn-sm d-back" data-act="close">' + icon('back') + ' รายการ</button>' +
       '<h2>#' + esc(o.orderId) + '</h2>' + statusPill(o) +
       '<span class="muted">สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + ' (' + R.ago(o.createdAt) + ')</span></div>' +
+      (o.zortVoidStatus === 'pending' ? zortLine(o) : '') +
       '<div class="d-grid">' +
 
       '<section class="card"><h3>ลูกค้า</h3>' +
@@ -273,25 +279,39 @@
         break;
       case 'done':
         note = 'คำสั่งซื้อเสร็จสมบูรณ์ ' + R.dateTH(o.doneAt, true);
+        acts.push(['cancelled', 'ยกเลิกการขายนี้ (คืนเงิน / คืนสินค้า)', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }]);
         break;
       case 'cancelled':
         note = 'ยกเลิกแล้ว: ' + (o.cancelReason || '-');
         break;
     }
-    if (['done', 'cancelled'].indexOf(o.status) < 0) acts.push(['cancelled', 'ยกเลิกคำสั่งซื้อ', 'danger', { needNote: true }]);
+    if (['done', 'cancelled'].indexOf(o.status) < 0) acts.push(['cancelled', 'ยกเลิกคำสั่งซื้อ', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }]);
     const slip = o.slipUrl
       ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>'
       : '';
     return '<section class="card span2"><h3>ขั้นตอนถัดไป</h3>' + slip +
-      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + zortLine(o) +
+      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
       '<div class="act-list">' + acts.map((a) =>
         '<button type="button" class="btn btn-' + a[2] + ' btn-block" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
-        (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + '>' + esc(a[1]) + '</button>').join('') +
+        (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + (a[3] && a[3].zortWarn ? ' data-zortwarn="1"' : '') + '>' + esc(a[1]) + '</button>').join('') +
       '</div></section>';
   }
 
   /** สถานะการบันทึกยอดขายใน ZORT (แสดงเมื่อปิดการขายแล้ว) */
   function zortLine(o) {
+    if (o.zortVoidStatus === 'pending') {
+      return '<div class="zort-void">' +
+        '<div class="zv-h">' + icon('alert') + '<strong>ต้องไปยกเลิกรายการนี้ใน ZORT เอง</strong></div>' +
+        '<p>คำสั่งซื้อนี้ถูกยกเลิกหลังจากบันทึกยอดขายใน ZORT แล้ว ระบบยกเลิกใน ZORT ให้อัตโนมัติไม่ได้ ยอดขายและสต็อกใน ZORT จึงยังไม่ถูกต้อง</p>' +
+        '<ol><li>เข้า ZORT → รายการขาย → ค้นหาเลขที่ <b>' + esc(o.orderId) + '</b>' + (/^\d+$/.test(o.zortOrderId) ? ' (รหัส ZORT ' + esc(o.zortOrderId) + ')' : '') + '</li>' +
+        '<li>กด "ยกเลิก (Void)" รายการนั้น และคืนสต็อกถ้าข้าวกลับมาที่ร้าน</li>' +
+        '<li>กลับมากดปุ่มด้านล่างเพื่อปิดงานนี้</li></ol>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-act="zort-void-done">' + icon('check') + ' ยกเลิกใน ZORT แล้ว</button></div>';
+    }
+    if (o.zortVoidStatus === 'done') {
+      return '<p class="zort-line ok">' + icon('check') + '<span>ยกเลิกใน ZORT แล้ว' + (o.zortVoidBy ? ' โดย ' + esc(o.zortVoidBy) : '') +
+        (o.zortVoidAt ? ' · ' + esc(R.dateTH(o.zortVoidAt, true)) : '') + '</span></p>';
+    }
     if (o.status !== 'done' || R.DEMO) return '';
     if (o.zortOrderId) {
       return '<p class="zort-line ok">' + icon('check') + '<span>บันทึกยอดขายใน ZORT แล้ว' +
@@ -302,6 +322,20 @@
     return '<div class="zort-line ' + (o.zortError ? 'err' : 'wait') + '">' + icon(o.zortError ? 'alert' : 'clock') +
       '<span>' + (o.zortError ? 'บันทึกยอดขายเข้า ZORT ไม่สำเร็จ: ' + esc(o.zortError) : 'ยังไม่ได้บันทึกยอดขายใน ZORT') + '</span>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-act="zort-push">' + icon('refresh') + ' ส่งเข้า ZORT' + (o.zortError ? 'อีกครั้ง' : '') + '</button></div>';
+  }
+
+  async function zortVoidDone() {
+    const o = A.orders.find((x) => x.orderId === A.sel);
+    if (!o) return;
+    const ok = await R.confirmBox('ยกเลิกใน ZORT แล้ว?', 'ยืนยันว่าได้ยกเลิก (Void) คำสั่งซื้อ #' + o.orderId + ' ในหน้า ZORT เรียบร้อยแล้ว', 'ยืนยัน ยกเลิกแล้ว', 'ยังไม่ได้ยกเลิก');
+    if (!ok) return;
+    R.busy(true, 'กำลังบันทึก...');
+    try {
+      const res = await R.api('adminZortVoidDone', { orderId: o.orderId });
+      replaceOrder(res.order);
+      render();
+      R.toast('ปิดงานยกเลิกใน ZORT แล้ว', 'ok');
+    } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
 
   async function zortPushOrder() {
@@ -357,11 +391,12 @@
   async function setStatus(btn) {
     const o = A.orders.find((x) => x.orderId === A.sel);
     const to = btn.dataset.to, label = btn.dataset.label;
-    const needNote = !!btn.dataset.neednote, askPay = !!btn.dataset.pay;
+    const needNote = !!btn.dataset.neednote, askPay = !!btn.dataset.pay, zortWarn = !!btn.dataset.zortwarn;
     let note = '', notify = true, payMethod = '';
     const ok = await R.modal({
       title: label + '?',
       html: '<p>คำสั่งซื้อ #' + esc(o.orderId) + ' ของ ' + esc(o.fullName || o.lineName) + '</p>' +
+        (zortWarn ? '<p class="zort-warn">' + icon('alert') + '<span>รายการนี้บันทึกยอดขายใน ZORT แล้ว — หลังยกเลิก ต้องไปยกเลิก (Void) ในหน้า ZORT เอง ระบบจะติดป้าย “รอยกเลิกใน ZORT” ไว้ให้</span></p>' : '') +
         (askPay ? '<label class="field" style="margin-top:.8rem"><span class="field-label">ลูกค้าจะจ่ายเงินแบบไหน</span><select class="select" id="m-pay"><option value="transfer">โอน / สแกนจ่าย</option><option value="cod">เงินสด</option></select></label>' : '') +
         '<label class="field" style="margin-top:.8rem"><span class="field-label">' + (needNote ? 'เหตุผล (ลูกค้าจะเห็นข้อความนี้)' : 'ข้อความถึงลูกค้า (ไม่บังคับ)') + '</span>' +
         '<input class="input" id="m-note" maxlength="300"' + (to === 'confirmed' && o.status === 'slip' ? ' value="ยอดเงินในสลิปไม่ตรง กรุณาตรวจสอบแล้วส่งใหม่"' : '') + '></label>' +
@@ -383,6 +418,7 @@
       replaceOrder(res.order);
       renderListOnly(); renderDetail();
       pushToast(res, 'บันทึกแล้ว');
+      if (res.needZortVoid || (res.order && res.order.zortVoidStatus === 'pending' && to === 'cancelled')) { A.filter = 'zortvoid'; render(); R.toast('อย่าลืมไปยกเลิกรายการนี้ในหน้า ZORT', 'err'); }
       if (res.zort && res.zort.ok) R.toast('ปิดการขายแล้ว และบันทึกยอดขายใน ZORT แล้ว', 'ok');
       else if (res.zort && res.zort.error) R.toast('ปิดการขายแล้ว แต่ส่งยอดขายเข้า ZORT ไม่สำเร็จ — กดส่งใหม่ได้ในหน้านี้', 'err');
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
@@ -504,6 +540,7 @@
       case 'csv': exportCsv(); break;
       case 'zort': zortSync(); break;
       case 'zort-push': zortPushOrder(); break;
+      case 'zort-void-done': zortVoidDone(); break;
       case 'send-quote': sendQuote(); break;
       case 'use-ship': {
         const o = A.orders.find((x) => x.orderId === A.sel);

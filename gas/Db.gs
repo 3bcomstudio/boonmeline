@@ -18,6 +18,7 @@ const SCHEMA = {
     'payMethod', 'confirmedAt', 'slipUrl', 'slipAt', 'paidAt', 'shippedAt', 'doneAt',
     'cancelReason', 'itemsJson', 'quoteJson', 'historyJson',
     'zortOrderId', 'zortSyncedAt', 'zortError',   // ← บันทึกยอดขายเข้า ZORT (ดู Zort.gs)
+    'zortVoidStatus', 'zortVoidAt', 'zortVoidBy',  // ← ยกเลิกหลังบันทึกเข้า ZORT: pending = ต้องไปยกเลิกใน ZORT เอง, done = ยกเลิกแล้ว
   ],
   Customers: [
     'userId', 'lineName', 'linePicture', 'fullName', 'phone',

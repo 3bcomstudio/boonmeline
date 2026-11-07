@@ -4,13 +4,13 @@
  */
 (function () {
   'use strict';
-  const KEY = 'rice_demo_db_v2';
+  const KEY = 'rice_demo_db_v3';
   const ME = { userId: 'Udemo-me', name: 'สมศรี ใจดี', picture: '' };
 
   const PURPOSE_LABEL = { home: 'กินเองที่บ้าน', donate: 'ทำบุญ / บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง / ขายต่อ', other: 'อื่น ๆ' };
   const TRANS = {
     new: ['cancelled'], quoted: ['confirmed', 'cancelled'], confirmed: ['paid', 'shipping', 'cancelled'],
-    slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'],
+    slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'], done: ['cancelled'],
   };
 
   /* สินค้าตัวอย่างสำหรับโหมดทดลองเท่านั้น — ระบบจริงดึงข้าวจาก ZORT */
@@ -72,7 +72,7 @@
         mk('R000000-902', 95, c2, 'restaurant', 'ร้านข้าวแกงนายหมู', [['p02', 20]], 'delivery',
           { status: 'slip', quote: quote2, total: quote2.total, payMethod: 'transfer', slipUrl: '#demo-slip', quotedAt: iso(80), confirmedAt: iso(60), slipAt: iso(40) }),
         mk('R000000-903', 60 * 26, c3, 'home', '', [['p03', 2]], 'pickup',
-          { status: 'done', quote: quote3, total: quote3.total, payMethod: 'cod', quotedAt: iso(60 * 25), confirmedAt: iso(60 * 24), paidAt: iso(60 * 20), doneAt: iso(60 * 20) }),
+          { status: 'done', quote: quote3, total: quote3.total, payMethod: 'cod', quotedAt: iso(60 * 25), confirmedAt: iso(60 * 24), paidAt: iso(60 * 20), doneAt: iso(60 * 20), zortOrderId: '123456', zortSyncedAt: iso(60 * 20) }),
       ],
       seq: 0,
     };
@@ -173,6 +173,12 @@
       return { admin: { userId: ME.userId, name: 'แอดมิน (ทดลอง)' }, orders: db.orders, products: PRODUCTS, settings: SETTINGS, sheetUrl: '', serverTime: new Date().toISOString() };
     },
     adminZortPushOrder() { err('demo', 'โหมดทดลองเชื่อม ZORT ไม่ได้'); },
+    adminZortVoidDone(db, req) {
+      const o = db.orders.find((x) => x.orderId === req.orderId) || err('not_found', 'ไม่พบคำสั่งซื้อ');
+      o.zortVoidStatus = 'done'; o.zortVoidAt = new Date().toISOString(); o.zortVoidBy = 'แอดมิน';
+      hist(o, 'admin:แอดมิน', 'ยกเลิกใน ZORT แล้ว');
+      return { order: o };
+    },
     adminZortSync() { err('demo', 'โหมดทดลองเชื่อม ZORT ไม่ได้ — ต้องตั้งค่า Apps Script ก่อน'); },
     adminQuote(db, req) {
       const o = db.orders.find((x) => x.orderId === req.orderId) || err('not_found', 'ไม่พบคำสั่งซื้อ');
@@ -200,7 +206,7 @@
       if (req.status === 'paid') o.paidAt = now;
       if (req.status === 'shipping') o.shippedAt = now;
       if (req.status === 'done') { o.doneAt = now; o.paidAt = o.paidAt || now; }
-      if (req.status === 'cancelled') o.cancelReason = req.note || 'ร้านยกเลิก';
+      if (req.status === 'cancelled') { o.cancelReason = req.note || 'ร้านยกเลิก'; if (o.zortOrderId) o.zortVoidStatus = 'pending'; }
       o.status = req.status;
       hist(o, 'admin:แอดมิน', req.note || '');
       return { order: o, pushed: false, pushError: req.notify === false ? '' : 'โหมดทดลอง: ไม่ได้ส่ง LINE จริง' };

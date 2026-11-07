@@ -151,3 +151,16 @@ button.kpi:hover { border-color: var(--brand); }
 .zort-line.ok { background: var(--green-50); color: var(--green); font-weight: 600; }
 .zort-line.wait { background: var(--gold-100); color: var(--gold-700); }
 .zort-line.err { background: var(--red-50); color: var(--red); }
+
+/* รอยกเลิกใน ZORT */
+.kpi.alarm { border: 2px solid var(--red); background: var(--red-50); }
+.kpi.alarm b, .kpi.alarm span { color: var(--red); font-weight: 700; }
+.o-row-flag { display: inline-flex; align-items: center; gap: .3rem; margin-top: .25rem; padding: .1rem .5rem; border-radius: 999px; background: var(--red-50); color: var(--red); font-size: .8rem; font-weight: 700; }
+.o-row-flag .ic { width: .95rem; height: .95rem; }
+.zort-void { margin: 0 0 1rem; padding: .9rem 1rem; border: 2px solid var(--red); border-radius: var(--r-sm); background: var(--red-50); color: var(--ink); font-size: .95rem; line-height: 1.55; }
+.zv-h { display: flex; align-items: center; gap: .45rem; color: var(--red); margin-bottom: .3rem; }
+.zv-h .ic { width: 1.25rem; height: 1.25rem; flex: none; }
+.zort-void p { margin: 0 0 .4rem; color: var(--ink-2); }
+.zort-void ol { margin: 0 0 .7rem; padding-left: 1.3rem; }
+.zort-warn { display: flex; gap: .5rem; align-items: flex-start; margin-top: .6rem; padding: .6rem .7rem; border-radius: var(--r-sm); background: var(--red-50); color: var(--red); font-size: .92rem; font-weight: 600; line-height: 1.5; }
+.zort-warn .ic { width: 1.2rem; height: 1.2rem; flex: none; margin-top: .15rem; }
