@@ -47,7 +47,7 @@
       '<button type="button" class="tbtn" data-act="refresh">' + icon('refresh') + 'รีเฟรช</button>' +
       '<button type="button" class="tbtn" data-act="sound" aria-pressed="' + sound + '">' + icon('bell') + 'เสียงเตือน</button>' +
       '<button type="button" class="tbtn" data-act="csv">' + icon('download') + 'ดาวน์โหลด CSV</button>' +
-      (A.zort && A.zort.configured ? '<button type="button" class="tbtn" data-act="zort" title="' + esc(zortTitle()) + '">' + icon('refresh') + 'ดึงสินค้าจาก ZORT</button>' : '') +
+      (!R.DEMO ? '<button type="button" class="tbtn" data-act="zort" title="' + esc(zortTitle()) + '">' + icon('refresh') + 'ดึงสินค้าจาก ZORT</button>' : '') +
       (A.sheetUrl ? '<a class="tbtn" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">' + icon('sheet') + 'Google Sheet</a>' : '') +
       '</div></header>' +
       '<section class="kpis" id="kpis">' + kpis() + '</section>' +
@@ -419,6 +419,12 @@
   }
 
   async function zortSync() {
+    if (!A.zort) {
+      return R.modal({ title: 'ยังดึงสินค้าจาก ZORT ไม่ได้', html: '<p>Apps Script ยังเป็นเวอร์ชันเก่า กรุณาอัปโหลดไฟล์ใน <code>gas/</code> (รวม <code>Zort.gs</code>) แล้ว Deploy เป็น New version</p>', actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }] });
+    }
+    if (!A.zort.configured) {
+      return R.modal({ title: 'ยังไม่ได้ตั้งค่า ZORT', html: '<p>ใส่ <code>ZORT_STORENAME</code>, <code>ZORT_APIKEY</code>, <code>ZORT_APISECRET</code> ใน Apps Script → Project Settings → Script properties</p><p class="muted">ได้ค่าจาก ZORT: Setting → Integration → ZORT Connect → ZORT API → Generate</p>', actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }] });
+    }
     R.busy(true, 'กำลังดึงสินค้าจาก ZORT...');
     try {
       const res = await R.api('adminZortSync');
