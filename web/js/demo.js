@@ -9,7 +9,7 @@
 
   const PURPOSE_LABEL = { home: 'กินเองที่บ้าน', donate: 'ทำบุญ / บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง / ขายต่อ', other: 'อื่น ๆ' };
   const TRANS = {
-    new: ['cancelled'], quoted: ['confirmed', 'cancelled'], confirmed: ['paid', 'shipping', 'cancelled'],
+    new: ['cancelled'], quoted: ['confirmed', 'cancelled'], confirmed: ['paid', 'shipping', 'done', 'cancelled'],
     slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'], done: ['cancelled'],
   };
 

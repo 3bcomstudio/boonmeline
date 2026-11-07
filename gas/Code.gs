@@ -41,7 +41,7 @@ const STATUS_LABEL = {
 const ADMIN_TRANSITIONS = {
   new: ['cancelled'],
   quoted: ['confirmed', 'cancelled'],
-  confirmed: ['paid', 'shipping', 'cancelled'],
+  confirmed: ['paid', 'shipping', 'done', 'cancelled'],   // done: เฉพาะเงินสดตอนรับข้าว
   slip: ['paid', 'confirmed', 'cancelled'],
   paid: ['shipping', 'done', 'cancelled'],
   shipping: ['done', 'cancelled'],
@@ -527,6 +527,9 @@ function apiAdminSetStatus_(admin, req) {
   const from = o.status;
   if ((ADMIN_TRANSITIONS[from] || []).indexOf(to) < 0) {
     fail_('bad_status', 'เปลี่ยนจาก "' + STATUS_LABEL[from] + '" เป็น "' + (STATUS_LABEL[to] || to) + '" ไม่ได้');
+  }
+  if (from === 'confirmed' && to === 'done' && o.payMethod !== 'cod') {
+    fail_('bad_status', 'คำสั่งซื้อนี้ลูกค้าเลือกโอนเงิน กรุณากด "ได้รับเงินแล้ว" ก่อน');
   }
   if (from === 'confirmed' && to === 'shipping' && o.payMethod !== 'cod') {
     fail_('bad_status', 'คำสั่งซื้อนี้ลูกค้าเลือกโอนเงิน กรุณากด "ได้รับเงินแล้ว" ก่อนจัดส่ง');
