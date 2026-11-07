@@ -104,6 +104,7 @@ function route_(req) {
     case 'adminQuote': return withLock_(function () { return apiAdminQuote_(admin, req); });
     case 'adminSetStatus': return withLock_(function () { return apiAdminSetStatus_(admin, req); });
     case 'adminZortSync': return apiAdminZortSync_();
+    case 'adminZortPushOrder': return withLock_(function () { return apiAdminZortPushOrder_(req); });
   }
   fail_('bad_action', 'ไม่รู้จักคำสั่ง ' + action);
 }
@@ -177,6 +178,7 @@ function orderView_(o) {
     slipUrl: o.slipUrl || '', slipAt: o.slipAt || '', paidAt: o.paidAt || '',
     shippedAt: o.shippedAt || '', doneAt: o.doneAt || '', cancelReason: String(o.cancelReason || ''),
     history: parseJson_(o.historyJson, []),
+    zortOrderId: String(o.zortOrderId || ''), zortSyncedAt: o.zortSyncedAt || '', zortError: String(o.zortError || ''),
   };
 }
 
@@ -455,6 +457,15 @@ function apiAdminBootstrap_(admin) {
   };
 }
 
+/** ปุ่ม "ส่งเข้า ZORT อีกครั้ง" ในหน้าแอดมิน */
+function apiAdminZortPushOrder_(req) {
+  const o = getOrderRow_(req.orderId);
+  if (!o) fail_('not_found', 'ไม่พบคำสั่งซื้อ');
+  if (o.status !== 'done') fail_('bad_status', 'บันทึกยอดขายเข้า ZORT ได้เมื่อปิดการขายแล้วเท่านั้น');
+  const zort = pushOrderToZort_(o, true);
+  return { order: orderView_(getOrderRow_(o.orderId)), zort: zort };
+}
+
 /** ปุ่ม "ดึงสินค้าจาก ZORT" ในหน้าแอดมิน */
 function apiAdminZortSync_() {
   const result = syncZortProducts();
@@ -520,8 +531,11 @@ function apiAdminSetStatus_(admin, req) {
   if (to === 'cancelled') patch.cancelReason = note || 'ร้านยกเลิก';
 
   const upd = updateOrder_(o, patch, 'admin:' + admin.name, note);
-  const view = orderView_(upd);
+  // ปิดการขาย → บันทึกยอดขายเข้า ZORT (ไม่สำเร็จก็ไม่ขวาง จดสาเหตุไว้ให้กดส่งใหม่)
+  let zort = null;
+  if (to === 'done') zort = pushOrderToZort_(getOrderRow_(o.orderId));
+  const view = orderView_(zort ? getOrderRow_(o.orderId) : upd);
   let push = { ok: false, skipped: true };
   if (req.notify !== false) push = pushToUser_(o.userId, [flexStatus_(view, getSettings_(), { from: from, note: note })]);
-  return { order: view, pushed: !!push.ok, pushError: push.error || '' };
+  return { order: view, pushed: !!push.ok, pushError: push.error || '', zort: zort };
 }

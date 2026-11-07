@@ -283,11 +283,38 @@
       ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>'
       : '';
     return '<section class="card span2"><h3>ขั้นตอนถัดไป</h3>' + slip +
-      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') +
+      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + zortLine(o) +
       '<div class="act-list">' + acts.map((a) =>
         '<button type="button" class="btn btn-' + a[2] + ' btn-block" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
         (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + '>' + esc(a[1]) + '</button>').join('') +
       '</div></section>';
+  }
+
+  /** สถานะการบันทึกยอดขายใน ZORT (แสดงเมื่อปิดการขายแล้ว) */
+  function zortLine(o) {
+    if (o.status !== 'done' || R.DEMO) return '';
+    if (o.zortOrderId) {
+      return '<p class="zort-line ok">' + icon('check') + '<span>บันทึกยอดขายใน ZORT แล้ว' +
+        (/^\d+$/.test(o.zortOrderId) ? ' (รหัส ZORT ' + esc(o.zortOrderId) + ')' : '') +
+        (o.zortSyncedAt ? ' · ' + esc(R.dateTH(o.zortSyncedAt, true)) : '') + '</span></p>';
+    }
+    if (!A.zort || !A.zort.configured) return '';
+    return '<div class="zort-line ' + (o.zortError ? 'err' : 'wait') + '">' + icon(o.zortError ? 'alert' : 'clock') +
+      '<span>' + (o.zortError ? 'บันทึกยอดขายเข้า ZORT ไม่สำเร็จ: ' + esc(o.zortError) : 'ยังไม่ได้บันทึกยอดขายใน ZORT') + '</span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-act="zort-push">' + icon('refresh') + ' ส่งเข้า ZORT' + (o.zortError ? 'อีกครั้ง' : '') + '</button></div>';
+  }
+
+  async function zortPushOrder() {
+    const o = A.orders.find((x) => x.orderId === A.sel);
+    if (!o) return;
+    R.busy(true, 'กำลังบันทึกยอดขายเข้า ZORT...');
+    try {
+      const res = await R.api('adminZortPushOrder', { orderId: o.orderId });
+      replaceOrder(res.order);
+      renderListOnly(); renderDetail();
+      if (res.zort && res.zort.ok) R.toast('บันทึกยอดขายใน ZORT แล้ว', 'ok');
+      else R.toast('ส่งเข้า ZORT ไม่สำเร็จ: ' + ((res.zort && res.zort.error) || ''), 'err');
+    } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
 
   /* =========================================================
@@ -356,6 +383,8 @@
       replaceOrder(res.order);
       renderListOnly(); renderDetail();
       pushToast(res, 'บันทึกแล้ว');
+      if (res.zort && res.zort.ok) R.toast('ปิดการขายแล้ว และบันทึกยอดขายใน ZORT แล้ว', 'ok');
+      else if (res.zort && res.zort.error) R.toast('ปิดการขายแล้ว แต่ส่งยอดขายเข้า ZORT ไม่สำเร็จ — กดส่งใหม่ได้ในหน้านี้', 'err');
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
 
@@ -474,6 +503,7 @@
         break;
       case 'csv': exportCsv(); break;
       case 'zort': zortSync(); break;
+      case 'zort-push': zortPushOrder(); break;
       case 'send-quote': sendQuote(); break;
       case 'use-ship': {
         const o = A.orders.find((x) => x.orderId === A.sel);

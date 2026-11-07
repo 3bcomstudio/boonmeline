@@ -172,6 +172,7 @@
     adminBootstrap(db) {
       return { admin: { userId: ME.userId, name: 'แอดมิน (ทดลอง)' }, orders: db.orders, products: PRODUCTS, settings: SETTINGS, sheetUrl: '', serverTime: new Date().toISOString() };
     },
+    adminZortPushOrder() { err('demo', 'โหมดทดลองเชื่อม ZORT ไม่ได้'); },
     adminZortSync() { err('demo', 'โหมดทดลองเชื่อม ZORT ไม่ได้ — ต้องตั้งค่า Apps Script ก่อน'); },
     adminQuote(db, req) {
       const o = db.orders.find((x) => x.orderId === req.orderId) || err('not_found', 'ไม่พบคำสั่งซื้อ');

@@ -143,3 +143,11 @@ button.kpi:hover { border-color: var(--brand); }
   .q-extra { grid-template-columns: 1fr; }
   .q-table th:nth-child(4), .q-table td:nth-child(4) { display: none; }
 }
+
+/* สถานะบันทึกยอดขายใน ZORT */
+.zort-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .7rem; margin: .7rem 0 0; padding: .65rem .8rem; border-radius: var(--r-sm); font-size: .95rem; }
+.zort-line .ic { width: 1.2rem; height: 1.2rem; flex: none; }
+.zort-line span { flex: 1 1 14rem; }
+.zort-line.ok { background: var(--green-50); color: var(--green); font-weight: 600; }
+.zort-line.wait { background: var(--gold-100); color: var(--gold-700); }
+.zort-line.err { background: var(--red-50); color: var(--red); }

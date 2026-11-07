@@ -17,6 +17,7 @@ const SCHEMA = {
     'subtotal', 'shippingFee', 'discount', 'total', 'quoteNote', 'quotedAt',
     'payMethod', 'confirmedAt', 'slipUrl', 'slipAt', 'paidAt', 'shippedAt', 'doneAt',
     'cancelReason', 'itemsJson', 'quoteJson', 'historyJson',
+    'zortOrderId', 'zortSyncedAt', 'zortError',   // ← บันทึกยอดขายเข้า ZORT (ดู Zort.gs)
   ],
   Customers: [
     'userId', 'lineName', 'linePicture', 'fullName', 'phone',
