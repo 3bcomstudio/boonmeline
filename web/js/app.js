@@ -210,30 +210,110 @@
     });
   }
 
-  function chipRow(key, label, values, fmt) {
-    if (values.length < 2) return '';
-    const pool = filtered(key);
-    const n = (v) => pool.filter((p) => fieldOf(p, key) === String(v)).length;
-    return '<div class="f-row"><span class="f-label">' + esc(label) + '</span><div class="chips f-chips" role="group" aria-label="' + esc(label) + '">' +
-      '<button type="button" class="chip" data-act="filter" data-k="' + key + '" data-v="" aria-pressed="' + !F[key] + '">ทั้งหมด</button>' +
-      values.map((v) => '<button type="button" class="chip" data-act="filter" data-k="' + key + '" data-v="' + esc(v) + '" aria-pressed="' + (F[key] === String(v)) + '"' +
-        (n(v) || F[key] === String(v) ? '' : ' disabled') + '>' + esc(fmt ? fmt(v) : v) + '</button>').join('') +
-      '</div></div>';
+  /* ตัวกรอง 3 แบบ: ปุ่มบนแถบ → แผ่นเลือกเลื่อนขึ้นจากด้านล่าง (ตัวเลือกเยอะก็ยังอ่านง่าย) */
+  const FILTERS = [
+    { key: 'cat', label: 'หมวด', title: 'เลือกหมวดข้าว', all: 'ทุกหมวด', fmt: (v) => v },
+    { key: 'unit', label: 'หน่วย', title: 'เลือกหน่วย', all: 'ทุกหน่วย', fmt: (v) => v },
+    { key: 'size', label: 'น้ำหนัก', title: 'เลือกน้ำหนักต่อหน่วย', all: 'ทุกน้ำหนัก', fmt: sizeLabel },
+  ];
+
+  function filterValues(key) {
+    if (key === 'size') return uniq(S.products.map((p) => Number(p.sizeKg) || 0).filter((k) => k > 0)).sort((a, b) => a - b).map(String);
+    const vals = uniq(S.products.map((p) => fieldOf(p, key)));
+    return vals.sort((a, b) => a.localeCompare(b, 'th'));
   }
 
-  function filterRows() {
-    const cats = uniq(S.products.map((p) => p.category || ''));
-    const units = uniq(S.products.map((p) => p.unit));
-    const sizes = uniq(S.products.map((p) => Number(p.sizeKg) || 0).filter((k) => k > 0)).sort((a, b) => a - b).map(String);
-    return chipRow('cat', 'หมวด', cats) + chipRow('unit', 'หน่วย', units) + chipRow('size', 'น้ำหนัก', sizes, sizeLabel);
+  function filterBar() {
+    const avail = FILTERS.filter((f) => filterValues(f.key).length >= 2);
+    if (!avail.length) return '';
+    const btns = avail.map((f) => {
+      const on = !!F[f.key];
+      return '<button type="button" class="fbtn' + (on ? ' is-on' : '') + '" data-act="fsheet" data-k="' + f.key + '" aria-haspopup="dialog"' +
+        ' aria-label="' + esc(f.label + ': ' + (on ? f.fmt(F[f.key]) : f.all)) + '">' +
+        '<span class="fbtn-val">' + esc(f.label) + '</span>' +
+        '<span class="fbtn-ic" aria-hidden="true">' + icon('chevron') + '</span></button>';
+    });
+    const pills = avail.filter((f) => F[f.key]).map((f) =>
+      '<button type="button" class="fpill" data-act="funset" data-k="' + f.key + '" aria-label="เอาตัวกรอง ' + esc(f.fmt(F[f.key])) + ' ออก">' +
+      '<span>' + esc(f.fmt(F[f.key])) + '</span>' + icon('x') + '</button>');
+    return '<div class="fbar fbar-' + btns.length + '">' + btns.join('') + '</div>' +
+      (pills.length ? '<div class="fpills">' + pills.join('') + '</div>' : '');
   }
 
   function shopFilters() {
-    const rows = filterRows();
     return '<section class="shop-filter" aria-label="ค้นหาข้าว">' +
       '<label class="f-search">' + icon('search') + '<span class="sr-only">ค้นหาข้าว</span>' +
-      '<input type="search" class="input" id="shop-q" placeholder="ค้นหา เช่น หอมมะลิ, 5 กก., กระสอบ" value="' + esc(F.q) + '" autocomplete="off"></label>' +
-      '<div id="f-rows">' + rows + '</div></section>';
+      '<input type="search" class="input" id="shop-q" placeholder="ค้นหา เช่น หอมมะลิ, 5 กก., กระสอบ" value="' + esc(F.q) + '" autocomplete="off" enterkeyhint="search"></label>' +
+      '<div id="f-rows">' + filterBar() + '</div></section>';
+  }
+
+  /** แผ่นเลือกตัวกรอง — แสดงจำนวนข้าวของแต่ละตัวเลือก (ตามตัวกรองอื่นที่เลือกอยู่) */
+  function openFilterSheet(key) {
+    const f = FILTERS.find((x) => x.key === key);
+    const pool = filtered(key);
+    const opts = [{ v: '', label: f.all, n: pool.length }].concat(filterValues(key).map((v) => ({
+      v, label: f.fmt(v), n: pool.filter((p) => fieldOf(p, key) === v).length,
+    })));
+    const withSearch = opts.length > 10;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap';
+    const row = (o) => {
+      const sel = F[key] === o.v;
+      return '<button type="button" class="opt' + (sel ? ' is-sel' : '') + '" data-v="' + esc(o.v) + '" role="option" aria-selected="' + sel + '"' +
+        (o.n || sel ? '' : ' disabled') + ' data-s="' + esc(o.label.toLowerCase()) + '">' +
+        '<span class="opt-label">' + esc(o.label) + '</span>' +
+        '<span class="opt-n">' + o.n + '</span>' +
+        '<span class="opt-check" aria-hidden="true">' + (sel ? icon('check') : '') + '</span></button>';
+    };
+    wrap.innerHTML = '<div class="modal sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">' +
+      '<div class="sheet-head"><h2 id="sheet-title" class="modal-title">' + esc(f.title) + '</h2>' +
+      '<button type="button" class="sheet-x" data-x aria-label="ปิด">' + icon('x') + '</button></div>' +
+      (withSearch ? '<label class="f-search sheet-search">' + icon('search') + '<span class="sr-only">ค้นหา' + esc(f.label) + '</span>' +
+        '<input type="search" class="input" placeholder="พิมพ์ชื่อ' + esc(f.label) + '" autocomplete="off"></label>' : '') +
+      '<div class="opt-list" role="listbox" aria-label="' + esc(f.title) + '">' + opts.map(row).join('') +
+      '<p class="opt-none" hidden>ไม่พบ' + esc(f.label) + 'ที่ค้นหา</p></div></div>';
+
+    const prevFocus = document.activeElement;
+    const close = () => {
+      wrap.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => wrap.remove(), 180);
+      if (prevFocus && prevFocus.focus) prevFocus.focus({ preventScroll: true });
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    wrap.addEventListener('click', (e) => {
+      const o = e.target.closest('.opt');
+      if (o && !o.disabled) {
+        F[key] = o.dataset.v;
+        close();
+        refreshShop();
+        const list = document.getElementById('prod-list');
+        if (list && list.getBoundingClientRect().top < 0) list.scrollIntoView({ block: 'start' });
+        return;
+      }
+      if (e.target === wrap || e.target.closest('[data-x]')) close();
+    });
+    const q = wrap.querySelector('.sheet-search input');
+    if (q) {
+      q.addEventListener('input', () => {
+        const t = q.value.trim().toLowerCase();
+        let shown = 0;
+        wrap.querySelectorAll('.opt').forEach((el) => {
+          const hit = !t || el.dataset.v === '' || el.dataset.s.indexOf(t) >= 0;
+          el.hidden = !hit; if (hit) shown++;
+        });
+        wrap.querySelector('.opt-none').hidden = shown > 1;
+      });
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => {
+      wrap.classList.add('show');
+      const sel = wrap.querySelector('.opt.is-sel');
+      if (sel) sel.scrollIntoView({ block: 'center' });
+      (sel || wrap.querySelector('.sheet-x')).focus({ preventScroll: true });
+    });
   }
 
   function prodListHtml() {
@@ -243,8 +323,8 @@
       return '<div class="empty">' + icon('search') + '<p>ไม่พบข้าวที่ค้นหา</p>' +
         '<button type="button" class="btn btn-ghost" data-act="filter-clear">ดูข้าวทั้งหมด</button></div>';
     }
-    return (active ? '<div class="f-count">พบ ' + list.length + ' จาก ' + S.products.length + ' รายการ' +
-      ' <button type="button" class="linkbtn" data-act="filter-clear">ล้างการค้นหา</button></div>' : '') +
+    return (active ? '<div class="f-count"><span>พบ <b>' + list.length + '</b> จาก ' + S.products.length + ' รายการ</span>' +
+      '<button type="button" class="linkbtn" data-act="filter-clear">ล้างตัวกรอง</button></div>' : '') +
       list.map(prodRow).join('');
   }
 
@@ -253,7 +333,7 @@
     const list = document.getElementById('prod-list');
     if (list) list.innerHTML = prodListHtml();
     const rows = document.getElementById('f-rows');
-    if (rows) rows.innerHTML = filterRows();
+    if (rows) rows.innerHTML = filterBar();
   }
 
   function prodRow(p) {
@@ -764,7 +844,8 @@
         R.toast('ขนาดตัวอักษร: ' + next.label);
         break;
       }
-      case 'filter': F[el.dataset.k] = el.dataset.v; refreshShop(); break;
+      case 'fsheet': openFilterSheet(el.dataset.k); break;
+      case 'funset': F[el.dataset.k] = ''; refreshShop(); break;
       case 'filter-clear': {
         F.q = ''; F.cat = ''; F.unit = ''; F.size = '';
         const q = document.getElementById('shop-q');
