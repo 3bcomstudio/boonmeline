@@ -196,7 +196,7 @@
 
     return {
       body:
-        '<div class="hello"><small>สวัสดี</small><strong>คุณ' + esc(first) + '</strong></div>' + alert +
+        helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
         '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">เลือกข้าว บอกจำนวน แล้วร้านคิดราคาให้</span></span></button>' +
@@ -213,6 +213,77 @@
         shopCard() + safetyNote(),
     };
   };
+
+  /* ---------- การ์ดต้อนรับ: ทักตามช่วงเวลา + สถานะร้านตอนนี้ ---------- */
+  function greeting(d) {
+    const h = d.getHours();
+    if (h < 11) return 'สวัสดีตอนเช้า';
+    if (h < 16) return 'สวัสดีตอนบ่าย';
+    if (h < 19) return 'สวัสดีตอนเย็น';
+    return 'สวัสดี';
+  }
+
+  const DAY_TH = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์'];
+  /** อ่านเวลาทำการจากข้อความ เช่น "วันจันทร์–วันเสาร์ 8.00–17.00 น." / "ทุกวัน 08:00–18:00" — อ่านไม่ออกคืน null */
+  function parseHours(text) {
+    const t = String(text || '');
+    const m = t.match(/(\d{1,2})[.:](\d{2})\s*(?:น\.?)?\s*[-–—ถึง]+\s*(\d{1,2})[.:](\d{2})/);
+    if (!m) return null;
+    const open = +m[1] * 60 + +m[2], close = +m[3] * 60 + +m[4];
+    let days = [0, 1, 2, 3, 4, 5, 6];
+    if (!/ทุกวัน/.test(t)) {
+      const idx = (name) => DAY_TH.findIndex((d) => name.indexOf(d) >= 0 || (d === 'พฤหัส' && /พฤ/.test(name)));
+      const range = t.match(/(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส\S*|ศุกร์|เสาร์)\s*[-–—ถึง]+\s*(?:วัน)?(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัส\S*|ศุกร์|เสาร์)/);
+      if (range) {
+        const a = idx(range[1]), b = idx(range[2]);
+        days = [];
+        for (let i = a; ; i = (i + 1) % 7) { days.push(i); if (i === b || days.length > 7) break; }
+      } else {
+        const listed = DAY_TH.map((d, i) => (t.indexOf(d) >= 0 ? i : -1)).filter((i) => i >= 0);
+        if (listed.length) days = listed;
+      }
+    }
+    return { open, close, days };
+  }
+  const hm = (min) => Math.floor(min / 60) + '.' + String(min % 60).padStart(2, '0') + ' น.';
+
+  function shopStatus(now) {
+    const hrs = parseHours(S.settings.SHOP_HOURS);
+    if (!hrs) return null;
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const today = now.getDay();
+    if (hrs.days.indexOf(today) >= 0 && mins >= hrs.open && mins < hrs.close) {
+      return { open: true, text: 'ร้านเปิดอยู่', sub: 'ปิด ' + hm(hrs.close) };
+    }
+    // หาวันเปิดถัดไป
+    for (let k = 0; k < 8; k++) {
+      const day = (today + k) % 7;
+      if (hrs.days.indexOf(day) < 0) continue;
+      if (k === 0 && mins >= hrs.open) continue;
+      const when = k === 0 ? 'วันนี้' : k === 1 ? 'พรุ่งนี้' : 'วัน' + DAY_TH[day];
+      return { open: false, text: 'ร้านปิดอยู่', sub: 'เปิด' + when + ' ' + hm(hrs.open) + ' · สั่งไว้ก่อนได้เลย' };
+    }
+    return null;
+  }
+
+  function helloCard(first) {
+    const now = new Date();
+    const name = first || 'ลูกค้า';
+    const pic = (S.user && S.user.picture) || (S.customer && S.customer.linePicture) || '';
+    const st = shopStatus(now);
+    const count = Number(S.customer && S.customer.orderCount) || 0;
+    return '<section class="hello-card">' +
+      '<div class="hc-top">' +
+      '<span class="hc-avatar" aria-hidden="true">' + (pic
+        ? '<img src="' + esc(pic) + '" alt="" width="64" height="64" referrerpolicy="no-referrer" onerror="this.remove()">'
+        : '') + '<span>' + esc(Array.from(name)[0] || '') + '</span></span>' +
+      '<div class="hc-text"><small>' + greeting(now) + '</small><strong>คุณ' + esc(name) + '</strong>' +
+      (count ? '<span class="hc-meta">' + icon('receipt') + 'สั่งข้าวกับร้านแล้ว ' + count + ' ครั้ง</span>' : '<span class="hc-meta">' + icon('check') + 'ยินดีต้อนรับลูกค้าใหม่</span>') +
+      '</div></div>' +
+      (st ? '<div class="hc-status ' + (st.open ? 'is-open' : 'is-closed') + '"><span class="dot" aria-hidden="true"></span>' +
+        '<strong>' + st.text + '</strong><span>' + esc(st.sub) + '</span></div>' : '') +
+      '</section>';
+  }
 
   function menuItem(o) {
     return '<button type="button" class="menu-item" data-act="' + o.act + '"' + (o.to ? ' data-to="' + o.to + '"' : '') + (o.id ? ' data-id="' + esc(o.id) + '"' : '') + '>' +
