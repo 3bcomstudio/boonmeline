@@ -4,7 +4,7 @@
   const R = window.Rice;
   const { esc, icon, money } = R;
 
-  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', zort: null, filter: 'todo', q: '', sel: '', loadedAt: 0 };
+  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', zort: null, filter: 'todo', q: '', pq: '', sel: '', view: 'overview', loadedAt: 0 };
   const root = document.getElementById('admin');
   const SOUND_KEY = 'rice_admin_sound';
   let sound = R.storage(SOUND_KEY) === true;
@@ -36,80 +36,228 @@
   }
 
   /* =========================================================
-   * Render
+   * Render — โครง: เมนูด้านข้าง (sidebar) + หัวหน้า + เนื้อหาแต่ละหน้า
+   *   หน้า: overview (ภาพรวม) / orders (คำสั่งซื้อ) / products (สินค้าข้าว) / shop (ข้อมูลร้าน)
    * ========================================================= */
+
+  const VIEWS = {
+    overview: { label: 'ภาพรวม', icon: 'grid' },
+    orders: { label: 'คำสั่งซื้อ', icon: 'receipt' },
+    products: { label: 'สินค้าข้าว', icon: 'rice' },
+    shop: { label: 'ข้อมูลร้าน', icon: 'store' },
+  };
+  const FILTER_ICON = { todo: 'bell', new: 'receipt', quoted: 'chat', pay: 'qr', ship: 'truck', done: 'check', cancelled: 'x', zortvoid: 'alert', all: 'list' };
+  const shopName = () => A.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่';
+  const countOf = (f) => A.orders.filter(f.test).length;
+  const filterOf = (id) => FILTERS.find((x) => x.id === id) || FILTERS[0];
 
   function render() {
     root.innerHTML =
       (R.DEMO ? '<div class="demo-banner"><span>โหมดทดลอง: ปุ่มส่ง LINE จะไม่ส่งจริง</span><span><a href="index.html">เปิดหน้าลูกค้า</a></span></div>' : '') +
-      '<header class="adm-top"><div class="adm-brand"><img src="assets/logo-96.png" alt="">' + esc(A.settings.SHOP_NAME || 'หจก.บุญมีหาดใหญ่') + ' <small>หลังร้าน</small></div>' +
-      '<span class="updated" id="updated"></span>' +
-      '<div class="adm-tools">' +
-      '<button type="button" class="tbtn" data-act="refresh">' + icon('refresh') + 'รีเฟรช</button>' +
-      '<button type="button" class="tbtn" data-act="sound" aria-pressed="' + sound + '">' + icon('bell') + 'เสียงเตือน</button>' +
-      '<button type="button" class="tbtn" data-act="csv">' + icon('download') + 'ดาวน์โหลด CSV</button>' +
-      (!R.DEMO ? '<button type="button" class="tbtn" data-act="zort" title="' + esc(zortTitle()) + '">' + icon('refresh') + 'ดึงสินค้าจาก ZORT</button>' : '') +
-      (A.zort && A.zort.imageFolderUrl ? '<a class="tbtn" href="' + esc(A.zort.imageFolderUrl) + '" target="_blank" rel="noopener" title="ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า แล้วกดดึงสินค้าจาก ZORT">' + icon('sheet') + 'โฟลเดอร์รูปสินค้า</a>' : '') +
-      (A.sheetUrl ? '<a class="tbtn" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">' + icon('sheet') + 'Google Sheet</a>' : '') +
-      '</div></header>' +
-      '<section class="kpis" id="kpis">' + kpis() + '</section>' +
-      '<div class="adm-main"><aside class="list-pane" aria-label="รายการคำสั่งซื้อ">' +
-      '<div class="filters" id="filters">' + filters() + '</div>' +
-      '<div class="search">' + icon('search') + '<input type="search" id="q" placeholder="ค้นหา เลขที่ ชื่อ เบอร์โทร" value="' + esc(A.q) + '" aria-label="ค้นหาคำสั่งซื้อ"></div>' +
-      '<div class="o-list" id="olist">' + list() + '</div></aside>' +
-      '<section class="detail-pane" id="detail">' + detail() + '</section></div>';
-    root.classList.toggle('show-detail', !!A.sel);
+      '<div class="shell">' +
+      '<nav class="side" id="side" aria-label="เมนูหลัก">' + sideNav() + '</nav>' +
+      '<div class="scrim" data-act="nav-close" aria-hidden="true"></div>' +
+      '<div class="main">' +
+      '<header class="mhead" id="mhead">' + mhead() + '</header>' +
+      '<div class="view view-' + A.view + '" id="view">' + viewHtml() + '</div>' +
+      '</div></div>';
+    root.classList.toggle('show-detail', A.view === 'orders' && !!A.sel);
     stamp();
   }
 
+  /** อัปเดตตัวเลข/รายการโดยไม่ล้างฟอร์มที่กำลังพิมพ์ */
   function renderListOnly() {
-    document.getElementById('kpis').innerHTML = kpis();
-    document.getElementById('filters').innerHTML = filters();
-    document.getElementById('olist').innerHTML = list();
+    const side = document.getElementById('side');
+    if (!side) return render();
+    const scroll = side.scrollTop;
+    side.innerHTML = sideNav(); side.scrollTop = scroll;
+    document.getElementById('mhead').innerHTML = mhead();
+    const view = document.getElementById('view');
+    if (A.view === 'orders') {
+      document.getElementById('fchips').innerHTML = chips();
+      document.getElementById('olist').innerHTML = list();
+    } else if (!(document.activeElement && view.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) {
+      view.innerHTML = viewHtml();
+    }
     stamp();
   }
   function renderDetail() {
-    document.getElementById('detail').innerHTML = detail();
+    const d = document.getElementById('detail');
+    if (!d) return;
+    d.innerHTML = detail();
     root.classList.toggle('show-detail', !!A.sel);
     document.querySelectorAll('.o-row').forEach((r) => r.classList.toggle('active', r.dataset.id === A.sel));
   }
   function stamp() {
-    const el = document.getElementById('updated');
-    if (el && A.loadedAt) el.textContent = 'อัปเดต ' + R.timeTH(new Date(A.loadedAt).toISOString());
+    if (!A.loadedAt) return;
+    const t = 'อัปเดตล่าสุด ' + R.timeTH(new Date(A.loadedAt).toISOString()) + ' น.';
+    document.querySelectorAll('[data-stamp]').forEach((el) => { el.textContent = t; });
+  }
+  function syncUrl() {
+    history.replaceState(null, '', location.pathname + (A.view === 'orders' && A.sel ? '?order=' + encodeURIComponent(A.sel) : '') + '#' + A.view + (A.view === 'orders' ? '/' + A.filter : ''));
+  }
+  function go(view, filter) {
+    A.view = VIEWS[view] ? view : 'overview';
+    if (filter) A.filter = filter;
+    if (A.view !== 'orders') A.sel = '';
+    root.classList.remove('nav-open');
+    syncUrl();
+    render();
+    window.scrollTo(0, 0);
   }
 
-  function kpis() {
+  /* ---------- เมนูด้านข้าง ---------- */
+
+  function sideNav() {
+    const item = (opts) => {
+      const on = opts.active;
+      const tag = opts.href ? 'a' : 'button';
+      const attrs = opts.href ? ' href="' + esc(opts.href) + '" target="_blank" rel="noopener"' : ' type="button" data-act="' + opts.act + '"' + (opts.id ? ' data-id="' + opts.id + '"' : '');
+      return '<' + tag + ' class="nav-i' + (on ? ' on' : '') + (opts.cls ? ' ' + opts.cls : '') + '"' + attrs + (on ? ' aria-current="page"' : '') + (opts.pressed !== undefined ? ' aria-pressed="' + opts.pressed + '"' : '') + '>' +
+        icon(opts.icon) + '<span class="nav-t">' + opts.label + (opts.sub ? '<small>' + opts.sub + '</small>' : '') + '</span>' +
+        (opts.badge !== undefined ? '<span class="nav-n' + (opts.hot ? ' hot' : '') + (opts.alarm ? ' alarm' : '') + '">' + opts.badge + '</span>' : '') +
+        (opts.href ? icon('external', 'nav-ext') : '') + (opts.toggle ? '<span class="nav-sw" aria-hidden="true"></span>' : '') +
+        '</' + tag + '>';
+    };
+    const orderItems = FILTERS.map((f) => {
+      const n = countOf(f);
+      if (f.onlyIfAny && !n && !(A.view === 'orders' && A.filter === f.id)) return '';
+      return item({ act: 'filter', id: f.id, icon: FILTER_ICON[f.id] || 'receipt', label: f.label, badge: n, hot: f.hot && n > 0 && f.id !== 'zortvoid', alarm: f.id === 'zortvoid' && n > 0, active: A.view === 'orders' && A.filter === f.id });
+    }).join('');
+    const z = A.zort || {};
+    const last = z.lastSync;
+    const activeProducts = A.products.filter((p) => p.active).length;
+    const who = (A.admin && A.admin.name) || 'แอดมิน';
+    return '<div class="side-brand"><img src="assets/logo-96.png" alt=""><div><b>' + esc(shopName()) + '</b><span>ระบบหลังร้าน</span></div>' +
+      '<button type="button" class="side-x" data-act="nav-close" aria-label="ปิดเมนู">' + icon('x') + '</button></div>' +
+      '<div class="side-scroll">' +
+      '<div class="nav-g">' + item({ act: 'view', id: 'overview', icon: 'grid', label: 'ภาพรวม', active: A.view === 'overview' }) + '</div>' +
+      '<div class="nav-g"><div class="nav-h">คำสั่งซื้อ</div>' + orderItems + '</div>' +
+      '<div class="nav-g"><div class="nav-h">สินค้า</div>' +
+      item({ act: 'view', id: 'products', icon: 'rice', label: 'สินค้าข้าว', badge: activeProducts, active: A.view === 'products' }) +
+      (!R.DEMO ? item({ act: 'zort', icon: 'refresh', label: 'ดึงสินค้าจาก ZORT', sub: last ? 'ล่าสุด ' + R.dateTH(last.at, true) : 'ยังไม่เคยดึง' }) : '') +
+      (z.imageFolderUrl ? item({ href: z.imageFolderUrl, icon: 'image', label: 'โฟลเดอร์รูปสินค้า' }) : '') +
+      '</div>' +
+      '<div class="nav-g"><div class="nav-h">ร้านและเครื่องมือ</div>' +
+      item({ act: 'view', id: 'shop', icon: 'store', label: 'ข้อมูลร้าน', active: A.view === 'shop' }) +
+      (A.sheetUrl ? item({ href: A.sheetUrl, icon: 'sheet', label: 'Google Sheet' }) : '') +
+      item({ act: 'csv', icon: 'download', label: 'ดาวน์โหลด CSV', sub: 'ตามรายการที่กรองอยู่' }) +
+      item({ act: 'sound', icon: 'bell', label: 'เสียงเตือนออเดอร์ใหม่', toggle: true, pressed: sound, cls: 'nav-toggle' }) +
+      '</div></div>' +
+      '<div class="side-foot"><span class="side-av">' + esc(who.trim().charAt(0) || 'A') + '</span>' +
+      '<div class="side-who"><b>' + esc(who) + '</b><span data-stamp></span></div>' +
+      '<button type="button" class="side-refresh" data-act="refresh" aria-label="รีเฟรชข้อมูล" title="รีเฟรชข้อมูล">' + icon('refresh') + '</button></div>';
+  }
+
+  /* ---------- หัวหน้า ---------- */
+
+  function mhead() {
+    let title = VIEWS[A.view].label, sub = '';
+    if (A.view === 'overview') {
+      title = 'ภาพรวมวันนี้';
+      sub = new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    } else if (A.view === 'orders') {
+      const f = filterOf(A.filter);
+      title = 'คำสั่งซื้อ · ' + f.label;
+      sub = countOf(f) + ' รายการ';
+    } else if (A.view === 'products') {
+      const l = A.zort && A.zort.lastSync;
+      sub = A.products.length + ' รายการ' + (l ? ' · ดึงจาก ZORT ล่าสุด ' + R.dateTH(l.at, true) : '');
+    } else sub = 'ข้อมูลที่ลูกค้าเห็นในหน้าสั่งข้าว';
+    const todo = countOf(FILTERS[0]);
+    return '<button type="button" class="mh-menu" data-act="nav-open" aria-label="เปิดเมนู">' + icon('menu') + (todo ? '<i class="mh-dot">' + todo + '</i>' : '') + '</button>' +
+      '<div class="mh-title"><h1>' + esc(title) + '</h1>' + (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div>' +
+      '<div class="mh-right"><span class="mh-stamp" data-stamp></span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-act="refresh">' + icon('refresh') + '<span>รีเฟรช</span></button></div>';
+  }
+
+  function viewHtml() {
+    if (A.view === 'orders') return ordersView();
+    if (A.view === 'products') return productsView();
+    if (A.view === 'shop') return shopView();
+    return overviewView();
+  }
+
+  /* ---------- หน้า: ภาพรวม ---------- */
+
+  function overviewView() {
     const now = new Date();
     const month = A.orders.filter((o) => { const d = new Date(o.createdAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+    const today = A.orders.filter((o) => new Date(o.createdAt).toDateString() === now.toDateString());
     const sold = month.filter((o) => ['paid', 'shipping', 'done'].indexOf(o.status) >= 0);
     const sales = sold.reduce((s, o) => s + (o.total || 0), 0);
     const bags = sold.reduce((s, o) => s + (o.totalBags || 0), 0);
-    const c = (st) => A.orders.filter((o) => o.status === st).length;
-    const ship = A.orders.filter((o) => o.status === 'paid' || isCodWaiting(o)).length;
+    const kg = sold.reduce((s, o) => s + (o.totalKg || 0), 0);
+    const c = (id) => countOf(filterOf(id));
+    const zv = c('zortvoid');
+    const card = (id, n, label, hint, ic, tone) =>
+      '<button type="button" class="stat' + (n ? ' ' + tone : '') + '" data-act="filter" data-id="' + id + '">' +
+      '<span class="stat-ic">' + icon(ic) + '</span><span class="stat-b"><b>' + n + '</b><span>' + label + '</span><small>' + hint + '</small></span>' +
+      icon('chevron', 'stat-go') + '</button>';
+
     const mix = {}; month.filter((o) => o.status !== 'cancelled').forEach((o) => { mix[o.purpose] = (mix[o.purpose] || 0) + 1; });
     const totalMix = Object.values(mix).reduce((a, b) => a + b, 0);
-    const k = (n, label, cls, f) => '<button type="button" class="kpi' + (cls ? ' ' + cls : '') + '" data-act="filter" data-id="' + f + '"><b>' + n + '</b><span>' + label + '</span></button>';
-    const zv = A.orders.filter((o) => o.zortVoidStatus === 'pending').length;
-    return (zv ? k(zv, 'รอยกเลิกใน ZORT', 'alarm', 'zortvoid') : '') +
-      k(c('new'), 'รอแจ้งราคา', c('new') ? 'hot' : '', 'new') +
-      k(c('slip'), 'รอตรวจสลิป', c('slip') ? 'hot' : '', 'pay') +
-      k(ship, 'ต้องจัดส่ง', ship ? 'hot' : '', 'ship') +
-      '<div class="kpi money"><b>฿' + money(sales) + '</b><span>ยอดขายเดือนนี้ (' + bags + ' ถุง)</span></div>' +
-      '<div class="kpi mix"><span>ลูกค้าซื้อไปทำอะไร (เดือนนี้ ' + totalMix + ' รายการ)</span>' +
-      '<div class="mix-bar">' + R.PURPOSES.map((p) => mix[p.id] ? '<i class="mx-' + p.id + '" style="width:' + (mix[p.id] / totalMix * 100) + '%" title="' + p.label + ' ' + mix[p.id] + '"></i>' : '').join('') + '</div>' +
-      '<div class="mix-legend">' + R.PURPOSES.map((p) => '<span><i class="mx-' + p.id + '"></i>' + p.label + ' ' + (mix[p.id] || 0) + '</span>').join('') + '</div></div>';
+
+    const todo = A.orders.filter(FILTERS[0].test).slice(0, 6);
+    const z = A.zort || {};
+    const last = z.lastSync;
+
+    return (zv ? '<button type="button" class="ov-alarm" data-act="filter" data-id="zortvoid">' + icon('alert') +
+        '<span><b>มี ' + zv + ' รายการที่ต้องไปยกเลิกในระบบ ZORT</b><small>ลูกค้ายกเลิกหลังบันทึกยอดขายเข้า ZORT แล้ว — กดเพื่อดูรายการ</small></span>' + icon('chevron') + '</button>' : '') +
+      '<div class="ov-sec-h"><h2>งานที่รอคุณ</h2><span>กดการ์ดเพื่อเปิดรายการ</span></div>' +
+      '<div class="stats">' +
+      card('new', c('new'), 'รอแจ้งราคา', 'ลูกค้าส่งรายการมาแล้ว', 'receipt', 'hot') +
+      card('pay', c('pay'), 'รอชำระ / ตรวจสลิป', 'ตรวจยอดเงินแล้วกดยืนยัน', 'qr', 'hot') +
+      card('ship', c('ship'), 'รอส่ง / กำลังส่ง', 'จัดข้าวและส่งให้ลูกค้า', 'truck', 'hot') +
+      card('quoted', c('quoted'), 'รอลูกค้ายืนยัน', 'ส่งราคาไปแล้ว รอตอบ', 'chat', 'calm') +
+      '</div>' +
+      '<div class="ov-grid">' +
+      '<section class="panel ov-todo"><div class="panel-h"><h3>' + icon('bell') + 'ต้องทำตอนนี้</h3>' +
+      '<button type="button" class="link-btn" data-act="filter" data-id="todo">ดูทั้งหมด (' + c('todo') + ')' + icon('chevron') + '</button></div>' +
+      (todo.length ? '<div class="mini-list">' + todo.map((o) =>
+        '<button type="button" class="mini" data-act="open" data-id="' + esc(o.orderId) + '">' +
+        '<span class="mini-av">' + esc(String(o.fullName || o.lineName || '?').trim().charAt(0)) + '</span>' +
+        '<span class="mini-b"><b>' + esc(o.fullName || o.lineName) + '</b><small>#' + esc(o.orderId) + ' · ' + o.totalBags + ' ถุง · ' + R.ago(o.createdAt) + '</small></span>' +
+        statusPill(o) + '</button>').join('') + '</div>'
+        : '<div class="empty-ok">' + icon('check') + '<b>ไม่มีงานค้าง</b><span>คำสั่งซื้อใหม่จะแสดงที่นี่ทันที</span></div>') +
+      '</section>' +
+      '<div class="ov-side">' +
+      '<section class="panel sales"><div class="panel-h"><h3>' + icon('cash') + 'ยอดขายเดือนนี้</h3></div>' +
+      '<div class="sales-big">฿' + money(sales) + '</div>' +
+      '<div class="sales-row"><span><b>' + sold.length + '</b>คำสั่งซื้อ</span><span><b>' + bags + '</b>ถุง</span><span><b>' + money(kg) + '</b>กก.</span><span><b>' + today.length + '</b>สั่งวันนี้</span></div>' +
+      '<p class="muted small">นับเฉพาะที่ได้รับเงินแล้ว / กำลังส่ง / สำเร็จ</p></section>' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('user') + 'ลูกค้าซื้อไปทำอะไร</h3><span class="muted small">เดือนนี้ ' + totalMix + ' รายการ</span></div>' +
+      '<div class="mix-bar">' + (totalMix ? R.PURPOSES.map((p) => mix[p.id] ? '<i class="mx-' + p.id + '" style="width:' + (mix[p.id] / totalMix * 100) + '%" title="' + p.label + ' ' + mix[p.id] + '"></i>' : '').join('') : '') + '</div>' +
+      '<ul class="mix-legend">' + R.PURPOSES.map((p) => '<li><i class="mx-' + p.id + '"></i><span>' + p.label + '</span><b>' + (mix[p.id] || 0) + '</b></li>').join('') + '</ul></section>' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('refresh') + 'ระบบ ZORT</h3>' +
+      '<span class="pill tone-' + (z.configured ? 'green' : 'done') + '">' + (z.configured ? 'เชื่อมแล้ว' : 'ยังไม่ตั้งค่า') + '</span></div>' +
+      '<dl class="kv kv-tight"><dt>ดึงสินค้าล่าสุด</dt><dd>' + (last ? R.dateTH(last.at, true) + ' (' + last.fetched + ' รายการ)' : '-') + '</dd>' +
+      '<dt>บันทึกยอดขาย</dt><dd>' + (z.pushOrders ? 'อัตโนมัติเมื่อปิดการขาย' : 'ปิดอยู่') + '</dd></dl>' +
+      (!R.DEMO ? '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:.7rem" data-act="zort">' + icon('refresh') + ' ดึงสินค้าจาก ZORT</button>' : '') +
+      '</section></div></div>';
   }
 
-  function filters() {
+  /* ---------- หน้า: คำสั่งซื้อ ---------- */
+
+  function chips() {
     return FILTERS.map((f) => {
-      const n = A.orders.filter(f.test).length;
+      const n = countOf(f);
       if (f.onlyIfAny && !n && A.filter !== f.id) return '';
       return '<button type="button" class="fchip' + (f.hot && n ? ' hot' : '') + '" data-act="filter" data-id="' + f.id + '" aria-pressed="' + (A.filter === f.id) + '">' + f.label + ' <b>' + n + '</b></button>';
     }).join('');
   }
 
+  function ordersView() {
+    return '<div class="orders">' +
+      '<aside class="list-pane" aria-label="รายการคำสั่งซื้อ">' +
+      '<div class="fchips" id="fchips">' + chips() + '</div>' +
+      '<div class="search">' + icon('search') + '<input type="search" id="q" placeholder="ค้นหา เลขที่ ชื่อ เบอร์โทร" value="' + esc(A.q) + '" aria-label="ค้นหาคำสั่งซื้อ"></div>' +
+      '<div class="o-list" id="olist">' + list() + '</div></aside>' +
+      '<section class="detail-pane" id="detail">' + detail() + '</section></div>';
+  }
+
   function visibleOrders() {
-    const f = FILTERS.find((x) => x.id === A.filter) || FILTERS[0];
+    const f = filterOf(A.filter);
     const q = A.q.trim().toLowerCase();
     return A.orders.filter(f.test).filter((o) => !q ||
       [o.orderId, o.fullName, o.lineName, o.phone, o.purposeNote, o.address].join(' ').toLowerCase().indexOf(q) >= 0 ||
@@ -118,7 +266,7 @@
 
   function list() {
     const rows = visibleOrders();
-    if (!rows.length) return '<div class="o-empty">' + (A.filter === 'todo' ? 'ไม่มีงานค้าง เยี่ยมมาก' : 'ไม่มีคำสั่งซื้อในกลุ่มนี้') + '</div>';
+    if (!rows.length) return '<div class="o-empty">' + icon(A.filter === 'todo' ? 'check' : 'receipt') + '<b>' + (A.q ? 'ไม่พบคำสั่งซื้อที่ค้นหา' : A.filter === 'todo' ? 'ไม่มีงานค้าง เยี่ยมมาก' : 'ไม่มีคำสั่งซื้อในกลุ่มนี้') + '</b></div>';
     return rows.map((o) =>
       '<button type="button" class="o-row' + (o.orderId === A.sel ? ' active' : '') + (o.status === 'new' ? ' is-new' : '') + '" data-act="open" data-id="' + esc(o.orderId) + '">' +
       '<div class="o-row-top"><b>#' + esc(o.orderId) + '</b>' + statusPill(o) + '</div>' +
@@ -128,11 +276,73 @@
       '</button>').join('');
   }
 
+  /* ---------- หน้า: สินค้าข้าว ---------- */
+
+  function productRows() {
+    const q = A.pq.trim().toLowerCase();
+    const rows = A.products.filter((p) => !q || [p.name, p.sku, p.category, p.unit, p.sizeKg + ' กก'].join(' ').toLowerCase().indexOf(q) >= 0);
+    if (!rows.length) return '<div class="o-empty">' + icon('rice') + '<b>' + (A.products.length ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้า — กด "ดึงสินค้าจาก ZORT"') + '</b></div>';
+    return rows.map((p) => {
+      const stock = p.stock === null || p.stock === undefined ? '<span class="muted">-</span>' : p.stock > 0 ? '<b>' + p.stock + '</b>' : '<span class="pill tone-red">หมด</span>';
+      return '<div class="p-row' + (p.active ? '' : ' off') + '">' +
+        '<span class="p-img">' + (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : R.sackLoader('2.4rem')) + '</span>' +
+        '<span class="p-name"><b>' + esc(p.name) + '</b><small>' + esc([p.sku && 'SKU ' + p.sku, p.category].filter(Boolean).join(' · ') || '-') + '</small></span>' +
+        '<span class="p-size">' + (p.sizeKg ? p.sizeKg + ' กก.' : '-') + ' / ' + esc(p.unit) + '</span>' +
+        '<span class="p-price"><b>฿' + money(p.price) + '</b>' + (p.priceWholesale ? '<small>ส่ง ฿' + money(p.priceWholesale) + '</small>' : '') + '</span>' +
+        '<span class="p-stock">' + stock + '</span>' +
+        '<span class="p-st"><span class="pill tone-' + (p.active ? 'green' : 'done') + '">' + (p.active ? 'ขายอยู่' : 'ซ่อน') + '</span></span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function productsView() {
+    const z = A.zort || {};
+    const noImg = A.products.filter((p) => !p.image).length;
+    return '<div class="toolbar">' +
+      '<div class="search grow">' + icon('search') + '<input type="search" id="pq" placeholder="ค้นหาชื่อข้าว SKU หมวด ขนาด" value="' + esc(A.pq) + '" aria-label="ค้นหาสินค้า"></div>' +
+      (!R.DEMO ? '<button type="button" class="btn btn-primary btn-sm" data-act="zort">' + icon('refresh') + ' ดึงสินค้าจาก ZORT</button>' : '') +
+      (z.imageFolderUrl ? '<a class="btn btn-ghost btn-sm" href="' + esc(z.imageFolderUrl) + '" target="_blank" rel="noopener">' + icon('image') + ' โฟลเดอร์รูป</a>' : '') +
+      '</div>' +
+      (noImg ? '<p class="hint-line">' + icon('image') + 'ยังไม่มีรูป ' + noImg + ' รายการ — กด "ดึงสินค้าจาก ZORT" ระบบจะค้นรูปตามชื่อสินค้าให้ หรือวางรูปในโฟลเดอร์รูปสินค้า</p>' : '') +
+      '<div class="panel p-table"><div class="p-head"><span></span><span>สินค้า</span><span>ขนาด</span><span>ราคาปลีก / ส่ง</span><span>สต็อก</span><span>สถานะ</span></div>' +
+      '<div id="prows">' + productRows() + '</div></div>' +
+      '<p class="muted small" style="margin-top:.7rem">แก้ชื่อ ราคา สต็อก ในระบบ ZORT แล้วกด "ดึงสินค้าจาก ZORT" — ราคาส่งและลำดับแก้ได้ในแท็บ Products ของ Google Sheet</p>';
+  }
+
+  /* ---------- หน้า: ข้อมูลร้าน ---------- */
+
+  function shopView() {
+    const s = A.settings;
+    const z = A.zort || {};
+    const yes = (v) => /^(true|1|yes)$/i.test(String(v));
+    const row = (k, v) => '<dt>' + k + '</dt><dd>' + (v === '' || v === undefined || v === null ? '<span class="muted">ยังไม่ได้ตั้ง</span>' : v) + '</dd>';
+    const phones = R.phoneList(s.SHOP_PHONE).map((d) => '<a href="tel:' + d + '">' + esc(R.phoneFmt(d)) + '</a>').join(', ');
+    return '<div class="shop-grid">' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('store') + 'ข้อมูลร้าน</h3></div><dl class="kv">' +
+      row('ชื่อร้าน', esc(s.SHOP_NAME || '')) + row('โทร', phones) + row('ที่อยู่', esc(s.SHOP_ADDRESS || '')) +
+      row('เวลาทำการ', esc(s.SHOP_HOURS || '')) + row('เลขผู้เสียภาษี', esc(s.SHOP_TAX_ID || '')) +
+      row('แจ้งราคา', esc(s.QUOTE_TIME || '')) + '</dl></section>' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('qr') + 'การรับเงิน</h3></div><dl class="kv">' +
+      row('พร้อมเพย์', esc(s.PROMPTPAY_ID || '')) + row('ชื่อบัญชี', esc(s.PROMPTPAY_NAME || '')) +
+      row('บัญชีอื่น', esc(s.BANK_INFO || '')) + row('รับเงินสด', yes(s.ALLOW_COD) ? 'รับ (ตอนส่ง / ตอนมารับ)' : 'ไม่รับ') + '</dl></section>' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('truck') + 'การจัดส่ง</h3></div><dl class="kv">' +
+      row('ค่าส่งเริ่มต้น', '฿' + money(Number(s.SHIP_BASE) || 0)) + row('ต่อกิโลเมตร', '฿' + money(Number(s.SHIP_PER_KM) || 0)) +
+      row('ส่งฟรีเมื่อครบ', Number(s.FREE_SHIP_BAGS) ? s.FREE_SHIP_BAGS + ' ถุง' : 'ไม่มี') + '</dl></section>' +
+      '<section class="panel"><div class="panel-h"><h3>' + icon('refresh') + 'การเชื่อมต่อ</h3></div><dl class="kv">' +
+      row('ZORT', z.configured ? '<span class="pill tone-green">เชื่อมแล้ว</span>' : '<span class="pill tone-done">ยังไม่ตั้งค่า</span>') +
+      row('บันทึกยอดขาย', z.pushOrders ? 'อัตโนมัติเมื่อปิดการขาย' : 'ปิดอยู่') +
+      row('แจ้งเตือนแอดมิน', yes(s.ADMIN_NOTIFY) ? 'ส่ง LINE เมื่อมีคำสั่งซื้อใหม่' : 'ปิดอยู่') +
+      row('ค้นรูปสินค้า', yes(s.WEB_IMAGE_SEARCH === undefined ? 'TRUE' : s.WEB_IMAGE_SEARCH) ? 'เปิด (ตามชื่อสินค้า)' : 'ปิดอยู่') + '</dl></section>' +
+      '</div>' +
+      '<div class="panel edit-note">' + icon('sheet') + '<div><b>ต้องการแก้ข้อมูลร้าน?</b><span>แก้ได้ที่แท็บ <b>Settings</b> ใน Google Sheet แล้วกดรีเฟรช หน้าลูกค้าจะอัปเดตภายใน 1 นาที</span></div>' +
+      (A.sheetUrl ? '<a class="btn btn-primary btn-sm" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">เปิด Google Sheet</a>' : '') + '</div>';
+  }
+
   /* ---------- รายละเอียดคำสั่งซื้อ ---------- */
 
   function detail() {
     const o = A.orders.find((x) => x.orderId === A.sel);
-    if (!o) return '<div class="d-empty"><div>' + icon('receipt') + '<p>เลือกคำสั่งซื้อทางซ้ายเพื่อดูรายละเอียด</p></div></div>';
+    if (!o) return '<div class="d-empty"><div>' + icon('receipt') + '<p><b>เลือกคำสั่งซื้อ</b><br>กดรายการทางซ้ายเพื่อดูรายละเอียด แจ้งราคา และอัปเดตสถานะ</p></div></div>';
     const c = o.customer || {};
     const p = R.purposeOf(o.purpose);
     const map = R.mapUrl(o.lat, o.lng);
@@ -417,7 +627,7 @@
       replaceOrder(res.order);
       renderListOnly(); renderDetail();
       pushToast(res, 'บันทึกแล้ว');
-      if (res.needZortVoid || (res.order && res.order.zortVoidStatus === 'pending' && to === 'cancelled')) { A.filter = 'zortvoid'; render(); R.toast('อย่าลืมไปยกเลิกรายการนี้ในหน้า ZORT', 'err'); }
+      if (res.needZortVoid || (res.order && res.order.zortVoidStatus === 'pending' && to === 'cancelled')) { A.filter = 'zortvoid'; syncUrl(); render(); R.toast('อย่าลืมไปยกเลิกรายการนี้ในหน้า ZORT', 'err'); }
       if (res.zort && res.zort.ok) R.toast('ปิดการขายแล้ว และบันทึกยอดขายใน ZORT แล้ว', 'ok');
       else if (res.zort && res.zort.error) R.toast('ปิดการขายแล้ว แต่ส่งยอดขายเข้า ZORT ไม่สำเร็จ — กดส่งใหม่ได้ในหน้านี้', 'err');
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
@@ -539,16 +749,28 @@
     const el = e.target.closest('[data-act]');
     if (!el) return;
     switch (el.dataset.act) {
-      case 'filter': A.filter = el.dataset.id; renderListOnly(); break;
-      case 'open':
-        A.sel = el.dataset.id; renderDetail();
-        history.replaceState(null, '', location.pathname + '?order=' + encodeURIComponent(A.sel));
+      case 'filter':
+        if (A.view !== 'orders') { go('orders', el.dataset.id); break; }
+        A.filter = el.dataset.id; root.classList.remove('nav-open'); syncUrl(); renderListOnly();
+        break;
+      case 'view': go(el.dataset.id); break;
+      case 'nav-open': root.classList.add('nav-open'); break;
+      case 'nav-close': root.classList.remove('nav-open'); break;
+      case 'open': {
+        const o = A.orders.find((x) => x.orderId === el.dataset.id);
+        A.sel = el.dataset.id;
+        if (A.view !== 'orders') {
+          if (o && !filterOf(A.filter).test(o)) A.filter = FILTERS[0].test(o) ? 'todo' : 'all';
+          go('orders');
+        } else { renderDetail(); syncUrl(); }
         if (window.innerWidth <= 900) window.scrollTo(0, 0);
         break;
-      case 'close': A.sel = ''; renderDetail(); history.replaceState(null, '', location.pathname); break;
+      }
+      case 'close': A.sel = ''; renderDetail(); syncUrl(); break;
       case 'refresh': refresh(true); break;
       case 'sound':
-        sound = !sound; R.storage(SOUND_KEY, sound); el.setAttribute('aria-pressed', String(sound));
+        sound = !sound; R.storage(SOUND_KEY, sound);
+        document.querySelectorAll('[data-act="sound"]').forEach((b) => b.setAttribute('aria-pressed', String(sound)));
         if (sound) beep();
         R.toast(sound ? 'เปิดเสียงเตือนคำสั่งซื้อใหม่' : 'ปิดเสียงเตือน');
         break;
@@ -569,6 +791,7 @@
 
   root.addEventListener('input', (e) => {
     if (e.target.id === 'q') { A.q = e.target.value; document.getElementById('olist').innerHTML = list(); return; }
+    if (e.target.id === 'pq') { A.pq = e.target.value; document.getElementById('prows').innerHTML = productRows(); return; }
     const k = e.target.dataset.q;
     if (!k) return;
     const o = A.orders.find((x) => x.orderId === A.sel);
@@ -613,8 +836,12 @@
       root.innerHTML = '<div class="gate"><h1>โหลดไม่สำเร็จ</h1><p>' + esc(e.message) + '</p><button type="button" class="btn btn-primary btn-block" style="margin-top:1rem" onclick="location.reload()">ลองใหม่</button></div>';
       return;
     }
+    const [hv, hf] = location.hash.replace(/^#\/?/, '').split('/');
+    if (VIEWS[hv]) A.view = hv;
+    if (hf && FILTERS.some((f) => f.id === hf)) A.filter = hf;
     const q = new URLSearchParams(location.search).get('order');
-    if (q && A.orders.some((o) => o.orderId === q)) { A.sel = q; A.filter = 'all'; }
+    if (q && A.orders.some((o) => o.orderId === q)) { A.sel = q; A.view = 'orders'; A.filter = 'all'; }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') root.classList.remove('nav-open'); });
     render();
     clearInterval(timer);
     timer = setInterval(() => { if (!document.hidden) refresh(false); }, 30000);
