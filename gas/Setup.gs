@@ -31,6 +31,8 @@ const DEFAULT_SETTINGS = [
   ['ZORT_ORDER_VATTYPE', '1', 'ZORT: 1 = ไม่มี VAT (ข้าวสารได้รับยกเว้น VAT) / 2 = แยก VAT / 3 = รวม VAT'],
   ['ZORT_PAYMENT_TRANSFER', 'โอนเงิน', 'ZORT: ชื่อวิธีชำระเงินเมื่อลูกค้าโอน (ให้ตรงกับที่ตั้งไว้ใน ZORT)'],
   ['ZORT_PAYMENT_CASH', 'เงินสด', 'ZORT: ชื่อวิธีชำระเงินเมื่อจ่ายเงินสด (ให้ตรงกับที่ตั้งไว้ใน ZORT)'],
+  ['WEB_IMAGE_SEARCH', 'TRUE', 'TRUE = สินค้าที่ไม่มีรูปใน Drive และ ZORT ให้ค้นรูปจากอินเทอร์เน็ต (ต้องใส่ BRAVE_SEARCH_API_KEY ใน Script properties)'],
+  ['WEB_IMAGE_MAX_PER_SYNC', '10', 'ค้นรูปจากเว็บได้สูงสุดกี่สินค้าต่อการซิงก์ 1 ครั้ง (ประหยัดเครดิต — รูปที่ได้เก็บไว้ ไม่ค้นซ้ำ)'],
   ['ZORT_HIDE_OUT_OF_STOCK', 'FALSE', 'ZORT: TRUE = ซ่อนข้าวที่สต็อกหมดจากหน้าลูกค้า'],
 ];
 
@@ -153,6 +155,7 @@ function checkConfig() {
     ZORT_STORENAME: '(ไม่บังคับ) ZORT → storename',
     ZORT_APIKEY: '(ไม่บังคับ) ZORT → API Key',
     ZORT_APISECRET: '(ไม่บังคับ) ZORT → API Secret',
+    BRAVE_SEARCH_API_KEY: '(ไม่บังคับ) ค้นรูปสินค้าจากเว็บ — สมัครที่ https://api-dashboard.search.brave.com/register',
   };
   Object.keys(need).forEach(function (k) {
     console.log((prop_(k) ? '✅ ' : '⚠️  ยังไม่ตั้ง ') + k + ' — ' + need[k]);

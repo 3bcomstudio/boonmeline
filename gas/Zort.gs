@@ -301,6 +301,146 @@ function resolveImage_(z, driveMap) {
   return { url: '', from: 'none' };
 }
 
+/* =========================================================
+ * รูปจากอินเทอร์เน็ต (Brave Image Search) — ใช้เมื่อไม่มีรูปใน Drive และใน ZORT
+ *   Script property: BRAVE_SEARCH_API_KEY  (สมัครที่ https://api-dashboard.search.brave.com/register)
+ *   แท็บ Settings:   WEB_IMAGE_SEARCH = TRUE/FALSE, WEB_IMAGE_MAX_PER_SYNC = จำนวนค้นสูงสุดต่อการซิงก์
+ *   รูปที่ได้จะดาวน์โหลดเก็บในโฟลเดอร์ย่อย "รูปจากเว็บ (อัตโนมัติ)" ชื่อไฟล์ z<zortId> → ครั้งต่อไปใช้ไฟล์เดิม ไม่ค้นซ้ำ
+ *   ไม่ถูกใจรูป: ลบไฟล์นั้นทิ้ง (ระบบจะค้นใหม่) หรือวางรูปที่ถูกต้องในโฟลเดอร์หลัก (ใช้ก่อนเสมอ)
+ * ========================================================= */
+
+const BRAVE_IMAGE_URL = 'https://api.search.brave.com/res/v1/images/search';
+const WEB_IMG_RETRY_DAYS = 7;   // ค้นไม่เจอ → รอ 7 วันค่อยค้นใหม่ (ประหยัดเครดิต)
+
+function webImageFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('WEB_IMG_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* สร้างใหม่ */ } }
+  const folder = productImageFolder_().createFolder('รูปจากเว็บ (อัตโนมัติ)');
+  folder.setDescription('รูปที่ระบบค้นจากอินเทอร์เน็ตให้อัตโนมัติ — ชื่อไฟล์ z<รหัสสินค้า ZORT> ลบทิ้งได้ถ้ารูปไม่ถูก (ระบบจะค้นใหม่) หรือวางรูปที่ถูกต้องในโฟลเดอร์หลักแทน');
+  props.setProperty('WEB_IMG_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+/** { 'z123': url } ของรูปที่เคยค้นและเก็บไว้แล้ว */
+function webImageMap_() {
+  const map = {};
+  const it = webImageFolder_().getFiles();
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!/^image\//.test(f.getMimeType())) continue;
+    map[imgKey_(f.getName())] = 'https://lh3.googleusercontent.com/d/' + f.getId() + '=w600';
+  }
+  return map;
+}
+
+/** ค้นรูปด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive — คืน url หรือ '' */
+function fetchWebImage_(z) {
+  const key = prop_('BRAVE_SEARCH_API_KEY');
+  let q = String(z.fullName || z.name).trim();
+  if (q.indexOf('ข้าว') < 0) q = 'ข้าว ' + q;
+  const res = UrlFetchApp.fetch(BRAVE_IMAGE_URL + '?' + [
+    'q=' + encodeURIComponent(q), 'search_lang=th', 'country=ALL', 'count=10', 'safesearch=strict', 'spellcheck=false',
+  ].join('&'), { headers: { 'X-Subscription-Token': key, Accept: 'application/json' }, muteHttpExceptions: true });
+  const http = res.getResponseCode();
+  if (http === 401 || http === 403) fail_('web_img_auth', 'BRAVE_SEARCH_API_KEY ไม่ถูกต้อง');
+  if (http === 429) fail_('web_img_quota', 'ค้นรูปเกินโควตา Brave (429)');
+  if (http !== 200) { console.error('Brave HTTP ' + http + ': ' + res.getContentText().slice(0, 200)); return ''; }
+  const results = (parseJson_(res.getContentText(), {}).results || []).slice(0, 6);
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    // thumbnail.src = รูปผ่าน proxy ของ Brave (กว้าง ~500px) โหลดได้เสถียรกว่ารูปต้นทาง
+    const candidates = [r.thumbnail && r.thumbnail.src, r.properties && r.properties.url].filter(Boolean);
+    for (let j = 0; j < candidates.length; j++) {
+      const blob = downloadImage_(candidates[j]);
+      if (!blob) continue;
+      const ext = blob.getContentType().split('/')[1].replace('jpeg', 'jpg');
+      const file = webImageFolder_().createFile(blob.setName('z' + z.zortId + '.' + ext));
+      file.setDescription('ค้นด้วย: ' + q + '\nจาก: ' + (r.url || r.source || '') + '\n' + (r.title || ''));
+      try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.error(e.message); }
+      return 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w600';
+    }
+  }
+  return '';
+}
+
+function downloadImage_(url) {
+  if (!/^https:\/\//i.test(String(url))) return null;
+  try {
+    const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (rice-order-bot)' } });
+    if (r.getResponseCode() !== 200) return null;
+    const blob = r.getBlob();
+    const type = String(blob.getContentType() || '').split(';')[0];
+    const size = blob.getBytes().length;
+    if (!/^image\/(jpeg|png|webp)$/.test(type) || size < 3000 || size > 4000000) return null;
+    return blob.setContentType(type);
+  } catch (e) { return null; }
+}
+
+function webSearchEnabled_() {
+  const s = getSettings_();
+  if (!prop_('BRAVE_SEARCH_API_KEY')) return false;
+  return s.WEB_IMAGE_SEARCH === undefined || s.WEB_IMAGE_SEARCH === '' || truthy_(s.WEB_IMAGE_SEARCH);
+}
+
+/** (ระหว่างล็อก — เร็ว) ใส่รูปจากเว็บที่เคยค้นเก็บไว้แล้ว */
+function applyWebImageCache_(objs, imgStat) {
+  if (!webSearchEnabled_()) return;
+  let cache = {};
+  try { cache = webImageMap_(); } catch (e) { console.error('อ่านโฟลเดอร์รูปจากเว็บไม่ได้: ' + e.message); return; }
+  objs.forEach(function (o) {
+    const url = !o.image && cache[imgKey_('z' + o.zortId)];
+    if (url) { o.image = url; imgStat.none--; imgStat.web++; }
+  });
+}
+
+/**
+ * (หลังปลดล็อก — ช้า) ค้นรูปใหม่ให้สินค้าที่ยังไม่มีรูป แล้วบันทึกทีละแถว
+ * แยกออกจากช่วงล็อก เพื่อไม่ให้ลูกค้าสั่งข้าวไม่ได้ระหว่างค้นรูป
+ */
+function searchMissingWebImages_(imgStat, startedAt) {
+  if (!webSearchEnabled_()) return;
+  const s = getSettings_();
+  const max = Math.max(0, Number(s.WEB_IMAGE_MAX_PER_SYNC === undefined || s.WEB_IMAGE_MAX_PER_SYNC === '' ? 10 : s.WEB_IMAGE_MAX_PER_SYNC) || 0);
+  const props = PropertiesService.getScriptProperties();
+  const miss = parseJson_(props.getProperty('WEB_IMG_MISS'), {});
+  const now = Date.now();
+  const todo = readAll_('Products').filter(function (r) {
+    const id = String(r.zortId || '').replace(/^'/, '');
+    return id && !r.image && !(miss[id] && now - miss[id] < WEB_IMG_RETRY_DAYS * 864e5);
+  });
+  let searched = 0;
+  for (let i = 0; i < todo.length && searched < max; i++) {
+    if (Date.now() - startedAt > 240000) break;                               // งบเวลา 4 นาที (Apps Script จำกัด 6 นาที)
+    const r = todo[i];
+    const id = String(r.zortId).replace(/^'/, '');
+    const name = String(r.name || '') + (num_(r.sizeKg) ? ' ' + num_(r.sizeKg) + ' กก.' : '');
+    searched++;
+    let url = '';
+    try { url = fetchWebImage_({ zortId: id, name: name, fullName: name }); } catch (err) {
+      console.error('ค้นรูปจากเว็บ: ' + err.message);
+      if (/quota|auth/.test(err.code || '')) break;                             // หยุดค้นรอบนี้
+      continue;
+    }
+    if (!url) { miss[id] = now; continue; }
+    delete miss[id];
+    withLock_(function () {
+      const row = findRow_('Products', 'zortId', id);
+      if (row && !row.image) updateRow_('Products', row._row, { image: url });
+    });
+    imgStat.none--; imgStat.web++;
+  }
+  imgStat.searched = searched;
+  props.setProperty('WEB_IMG_MISS', JSON.stringify(miss));
+}
+
+/** ทดสอบค้นรูป 1 ชื่อ — แก้ชื่อในฟังก์ชันแล้วกด Run ดูผลใน Execution log */
+function testWebImage() {
+  const name = 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.';
+  const url = fetchWebImage_({ zortId: 'test', name: name, fullName: name });
+  console.log(url ? '✅ ได้รูป: ' + url + '  (ไฟล์ z_test ในโฟลเดอร์รูปจากเว็บ ลบทิ้งได้)' : '❌ ไม่พบรูป');
+}
+
 /** รันเพื่อดูลิงก์โฟลเดอร์รูปสินค้า */
 function productImageFolder() {
   console.log('📁 โฟลเดอร์รูปสินค้า: ' + productImageFolder_().getUrl());
@@ -328,7 +468,8 @@ function zortSizeKg_(name, weightGram) {
  *   - ถ้าดึงจาก ZORT ไม่สำเร็จ หรือได้ 0 รายการ จะไม่แตะชีตเลย (กันรายการข้าวหายหมดเพราะเน็ตหรือตั้งค่าผิด)
  */
 function syncZortProducts() {
-  return withLock_(function () {
+  const startedAt = Date.now();
+  const result = withLock_(function () {
     const items = zortFetchRiceProducts_();
     if (!items.length) {
       fail_('zort_empty', 'ดึงจาก ZORT ได้ 0 รายการ จึงยังไม่แก้แท็บ Products — ' + zortDiagnose_());
@@ -348,7 +489,7 @@ function syncZortProducts() {
 
     let driveMap = {};
     try { driveMap = driveImageMap_(); } catch (err) { console.error('อ่านโฟลเดอร์รูปไม่ได้: ' + err.message); }
-    const imgStat = { drive: 0, zort: 0, none: 0 };
+    const imgStat = { drive: 0, zort: 0, web: 0, none: 0 };
 
     const now = new Date();
     let nextSort = Object.keys(keep).reduce(function (m, k) { return Math.max(m, num_(keep[k].sort)); }, 0) + 1;
@@ -365,6 +506,7 @@ function syncZortProducts() {
         sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now,
       };
     }).sort(function (a, b) { return a.sort - b.sort; });
+    applyWebImageCache_(objs, imgStat);
     const gone = Object.keys(keep).filter(function (k) {
       return !items.some(function (z) { return z.zortId === k; });
     }).length;
@@ -381,10 +523,15 @@ function syncZortProducts() {
       removed: removed + gone, at: now.toISOString(),
       images: imgStat,
     };
-    PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(result));
-    console.log('ZORT sync: ' + JSON.stringify(result));
     return result;
   });
+  // ค้นรูปจากเว็บหลังปลดล็อก (ลูกค้ายังสั่งข้าวได้ระหว่างนี้)
+  try { searchMissingWebImages_(result.images, startedAt); } catch (err) { console.error('ค้นรูปจากเว็บล้มเหลว: ' + err.message); }
+  result.images.webSearch = webSearchEnabled_();
+  clearCache();
+  PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(result));
+  console.log('ZORT sync: ' + JSON.stringify(result));
+  return result;
 }
 
 /* =========================================================
