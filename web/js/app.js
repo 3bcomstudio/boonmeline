@@ -202,16 +202,16 @@
         helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
-        '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ และจำนวน แล้วรอร้านแจ้งราคา</span></span></button>' +
+        '<span class="cta-text"><strong>สั่งซื้อข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ จำนวน และรอร้านตอบกลับ</span></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
-        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่ง และติดตามสถานะการจัดส่ง', badge: pending.length }) +
+        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่งซื้อ และติดตามสถานะการจัดส่ง', badge: pending.length }) +
         menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่สำหรับจัดส่ง' }) +
         (S.settings.SHOP_PHONE ? '<a class="menu-item call" href="' + telLink() + '"><span class="mi-ic">' + icon('phone') + '</span>' +
           '<span class="mi-text"><strong>ติดต่อร้าน</strong><span class="mi-sub">' + esc(mainPhone()) + (S.settings.SHOP_HOURS ? ' · เปิด ' + esc(S.settings.SHOP_HOURS) : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
         '</nav>' +
         '<section class="how"><h2>ใช้งานง่าย เพียง 3 ขั้นตอน</h2><ol>' +
-        '<li><b>1</b><span>ระบุยี่ห้อ และจำนวนที่ต้องการ</span></li>' +
-        '<li><b>2</b><span>รอทางร้านแจ้งราคาขาย <small>จะตอบกลับผ่านช่องทางนี้เท่านั้น</small></span></li>' +
+        '<li><b>1</b><span>ระบุยี่ห้อ และจำนวนที่ต้องการสั่งซื้อ</span></li>' +
+        '<li><b>2</b><span>รอทางร้านตอบกลับเพื่อแจ้งราคา <small>ผ่านช่องทางนี้เท่านั้น</small></span></li>' +
         '<li><b>3</b><span>กดยืนยันราคา และชำระเงินออนไลน์ หรือชำระเงินตอนรับสินค้า</span></li></ol></section>' +
         shopCard() + safetyNote(),
     };
@@ -326,13 +326,13 @@
   VIEWS.shop = function () {
     if (!S.products.length) {
       return {
-        back: '#/', top: 'สั่งข้าวสาร',
+        back: '#/', top: 'สั่งซื้อข้าวสาร',
         body: stepHead(1, 'เลือกข้าวที่ต้องการ', '') + '<div class="prod-list"><div class="empty">' + icon('rice') + '<p>ตอนนี้ยังไม่มีข้าวให้เลือก กรุณาโทรหาร้าน</p></div></div>',
         bar: shopBar(),
       };
     }
     return {
-      back: '#/', top: 'สั่งข้าวสาร',
+      back: '#/', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'กดปุ่ม + เพื่อเพิ่มจำนวน') + shopFilters() +
         '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
@@ -651,7 +651,7 @@
     }
     const tiles = R.PURPOSES.map((p) => tile({ act: 'purpose', id: p.id, icon: p.icon, label: p.label, sub: p.hint, on: cart.purpose === p.id, wide: p.id === 'other' })).join('');
     return {
-      back: '#/shop', top: 'สั่งข้าวสาร',
+      back: '#/shop', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'ร้านจะคิดราคาให้เหมาะกับการใช้งานของคุณ') +
         '<div class="tiles">' + tiles + '</div><div id="purpose-note">' + purposeNoteField() + '</div>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ไปขั้นต่อไป ' + icon('chevron') + '</button>',
@@ -700,7 +700,7 @@
     const minDate = ymd(start);
     const badDate = cart.wantMode === 'date' && cart.wantDate && !openOn(new Date(cart.wantDate + 'T12:00:00'));
     return {
-      back: '#/purpose', top: 'สั่งข้าวสาร',
+      back: '#/purpose', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(3, 'รับข้าวอย่างไร', '') +
         '<div class="tiles one">' +
         tile({ act: 'method', id: 'delivery', icon: 'truck', label: 'ส่งถึงที่', sub: 'ร้านนำข้าวไปส่งให้', on: cart.deliveryMethod === 'delivery' }) +
@@ -743,7 +743,7 @@
       ? 'มารับเองที่ร้าน'
       : 'ส่งถึงที่: ' + (cart.address || 'ตามตำแหน่งบนแผนที่');
     return {
-      back: '#/delivery', top: 'สั่งข้าวสาร',
+      back: '#/delivery', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(4, 'ตรวจสอบก่อนส่ง', 'ถ้าถูกต้องแล้ว กดปุ่มสีเขียวด้านล่าง') +
         '<div class="bill">' +
         '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">ใบสั่งข้าว</div>' +
@@ -819,7 +819,7 @@
     const list = S.orders.length
       ? '<div class="order-list">' + S.orders.map(orderCard).join('') + '</div>'
       : '<div class="empty">' + icon('receipt') + '<p>ยังไม่เคยสั่งข้าว</p>' +
-        '<button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" data-act="go" data-to="#/shop">สั่งข้าวสาร</button></div>';
+        '<button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" data-act="go" data-to="#/shop">สั่งซื้อข้าวสาร</button></div>';
     return {
       back: '#/', top: 'ประวัติการสั่ง',
       body: '<h1 class="page-title" style="margin-bottom:.9rem">ประวัติการสั่ง</h1>' + list,
