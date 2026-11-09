@@ -302,15 +302,19 @@ function resolveImage_(z, driveMap) {
 }
 
 /* =========================================================
- * รูปจากอินเทอร์เน็ต (Brave Image Search) — ใช้เมื่อไม่มีรูปใน Drive และใน ZORT
- *   Script property: BRAVE_SEARCH_API_KEY  (สมัครที่ https://api-dashboard.search.brave.com/register)
+ * รูปจากอินเทอร์เน็ต (ฟรี ไม่ต้องสมัคร ไม่ต้องใช้ key) — ใช้เมื่อไม่มีรูปใน Drive และใน ZORT
+ *   ค้นด้วยชื่อสินค้าใน Open Food Facts (ฐานข้อมูลสินค้าอาหารแบบเปิด มีข้าวถุงยี่ห้อไทยหลายยี่ห้อ, รูปใช้สัญญา CC BY-SA)
+ *   รับเฉพาะผลที่อยู่หมวด "ข้าว" ชื่อชนิดข้าวตรงกัน และยี่ห้อตรงกัน (ถ้าชื่อสินค้ามียี่ห้อ) — ไม่ตรงพอ = ไม่ใส่รูป
  *   แท็บ Settings:   WEB_IMAGE_SEARCH = TRUE/FALSE, WEB_IMAGE_MAX_PER_SYNC = จำนวนค้นสูงสุดต่อการซิงก์
- *   รูปที่ได้จะดาวน์โหลดเก็บในโฟลเดอร์ย่อย "รูปจากเว็บ (อัตโนมัติ)" ชื่อไฟล์ z<zortId> → ครั้งต่อไปใช้ไฟล์เดิม ไม่ค้นซ้ำ
+ *   รูปที่ได้ดาวน์โหลดเก็บในโฟลเดอร์ย่อย "รูปจากเว็บ (อัตโนมัติ)" ชื่อไฟล์ z<zortId> และบันทึกลิงก์ในแท็บ Products → ครั้งต่อไปใช้ไฟล์เดิม ไม่ค้นซ้ำ
  *   ไม่ถูกใจรูป: ลบไฟล์นั้นทิ้ง (ระบบจะค้นใหม่) หรือวางรูปที่ถูกต้องในโฟลเดอร์หลัก (ใช้ก่อนเสมอ)
  * ========================================================= */
 
-const BRAVE_IMAGE_URL = 'https://api.search.brave.com/res/v1/images/search';
-const WEB_IMG_RETRY_DAYS = 7;   // ค้นไม่เจอ → รอ 7 วันค่อยค้นใหม่ (ประหยัดเครดิต)
+const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
+const OFF_UA = 'BoonmeeHatyaiRiceShop/1.0 (Google Apps Script)';
+const WEB_IMG_RETRY_DAYS = 7;   // ค้นไม่เจอ → รอ 7 วันค่อยค้นใหม่
+// คำที่บอกว่าเป็นอาหารสำเร็จรูป/ขนม ไม่ใช่ข้าวสาร
+const OFF_NOT_RAW_RE = /พร้อมทาน|ข้าวสวย|ขนม|อบกรอบ|เกรียบ|หมู|ไก่|กุ้ง|ปลา|ผัด|แกง|ลาบ|โจ๊ก|ต้ม|ไข่|ทูน่า|กะเพรา|คลุก|ห่อ|แท่ง|ready|snack|cracker|chicken|pork/i;
 
 function webImageFolder_() {
   const props = PropertiesService.getScriptProperties();
@@ -334,34 +338,95 @@ function webImageMap_() {
   return map;
 }
 
-/** ค้นรูปด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive — คืน url หรือ '' */
-function fetchWebImage_(z) {
-  const key = prop_('BRAVE_SEARCH_API_KEY');
-  let q = String(z.fullName || z.name).trim();
-  if (q.indexOf('ข้าว') < 0) q = 'ข้าว ' + q;
-  const res = UrlFetchApp.fetch(BRAVE_IMAGE_URL + '?' + [
-    'q=' + encodeURIComponent(q), 'search_lang=th', 'country=ALL', 'count=10', 'safesearch=strict', 'spellcheck=false',
-  ].join('&'), { headers: { 'X-Subscription-Token': key, Accept: 'application/json' }, muteHttpExceptions: true });
-  const http = res.getResponseCode();
-  if (http === 401 || http === 403) fail_('web_img_auth', 'BRAVE_SEARCH_API_KEY ไม่ถูกต้อง');
-  if (http === 429) fail_('web_img_quota', 'ค้นรูปเกินโควตา Brave (429)');
-  if (http !== 200) { console.error('Brave HTTP ' + http + ': ' + res.getContentText().slice(0, 200)); return ''; }
-  const results = (parseJson_(res.getContentText(), {}).results || []).slice(0, 6);
-  for (let i = 0; i < results.length; i++) {
-    const r = results[i];
-    // thumbnail.src = รูปผ่าน proxy ของ Brave (กว้าง ~500px) โหลดได้เสถียรกว่ารูปต้นทาง
-    const candidates = [r.thumbnail && r.thumbnail.src, r.properties && r.properties.url].filter(Boolean);
-    for (let j = 0; j < candidates.length; j++) {
-      const blob = downloadImage_(candidates[j]);
-      if (!blob) continue;
-      const ext = blob.getContentType().split('/')[1].replace('jpeg', 'jpg');
-      const file = webImageFolder_().createFile(blob.setName('z' + z.zortId + '.' + ext));
-      file.setDescription('ค้นด้วย: ' + q + '\nจาก: ' + (r.url || r.source || '') + '\n' + (r.title || ''));
-      try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.error(e.message); }
-      return 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w600';
+function offNorm_(s) { return String(s || '').toLowerCase().replace(/[\s.\-_()%]+/g, ''); }
+
+/** แยกชื่อสินค้า → { type: 'ข้าวหอมมะลิ', brands: ['ฉัตรทอง'], query } (ตัดขนาด เช่น 5 กก. ออก) */
+function offParseName_(name) {
+  const base = String(name || '').replace(/\d+(\.\d+)?\s*(กก\.?|กิโลกรัม|กิโล|kg|กรัม|g)(?![a-zก-๙])/gi, ' ').replace(/\s+/g, ' ').trim();
+  let type = '';
+  const brands = [];
+  base.split(' ').forEach(function (w) {
+    if (!w || w === 'ตรา') return;
+    const m = w.match(/^(.*?)ตรา(.+)$/);              // "ข้าวหอมมะลิตราฉัตร" หรือ "ตราฉัตร"
+    if (m) {
+      if (m[1] && !type && m[1].indexOf('ข้าว') >= 0) type = m[1];
+      brands.push(m[2]);
+      return;
     }
-  }
-  return '';
+    if (!type && w.indexOf('ข้าว') >= 0) { type = w; return; }
+    if (/^\d+%?$/.test(w)) return;                    // "100%"
+    brands.push(w);
+  });
+  return {
+    type: type || 'ข้าว',
+    brands: brands.filter(function (b) { return b.length >= 2; }),
+    query: base.indexOf('ข้าว') < 0 ? 'ข้าว ' + base : base,
+  };
+}
+
+function offKg_(q) {
+  const m = String(q || '').toLowerCase().replace(/,/g, '.').match(/([\d.]+)\s*(kg|กก|กิโล|g|กรัม)/);
+  if (!m) return 0;
+  const n = Number(m[1]) || 0;
+  return /^(kg|กก|กิโล)/.test(m[2]) ? n : n / 1000;
+}
+
+/** เลือกผลที่ตรงที่สุดจาก Open Food Facts — ไม่ตรงพอคืน null */
+function offPickBest_(name, sizeKg, hits) {
+  const want = offParseName_(name);
+  const type = offNorm_(want.type);
+  let best = null;
+  (hits || []).forEach(function (h) {
+    const pname = String(h.product_name || '');
+    if (!h.image_front_url || !pname) return;
+    if (OFF_NOT_RAW_RE.test(pname) && !OFF_NOT_RAW_RE.test(name)) return;      // อาหารสำเร็จรูป/ขนม
+    const kg = offKg_(h.quantity);
+    if (kg && kg < 0.5) return;                                                // ถุงเล็กแบบพร้อมทาน
+    const brandList = [].concat(h.brands || []);
+    const text = offNorm_(pname + ' ' + brandList.join(' '));
+    if (text.indexOf(type) < 0) return;                                        // ชนิดข้าวต้องตรง
+    const hb = brandList.map(offNorm_).filter(function (b) { return b.length >= 4; });
+    const brandHit = want.brands.filter(function (b) {
+      const nb = offNorm_(b);
+      return text.indexOf(nb) >= 0 || hb.some(function (x) { return nb.indexOf(x) >= 0; });
+    }).length;
+    if (want.brands.length && !brandHit) return;                               // มียี่ห้อแต่ไม่ตรง → ไม่เอา (กันรูปยี่ห้ออื่น)
+    let score = 10 + brandHit * 5;
+    if (sizeKg && kg && Math.abs(kg - sizeKg) < 0.01) score += 2;
+    if (!best || score > best.score) best = { score: score, hit: h };
+  });
+  return best ? best.hit : null;
+}
+
+/** ค้นใน Open Food Facts — คืนรายการผล (โยน web_img_down ถ้าบริการล่มชั่วคราว) */
+function offSearch_(query) {
+  const q = query + ' categories_tags:"en:rices"';
+  const res = UrlFetchApp.fetch(OFF_SEARCH_URL + '?' + [
+    'q=' + encodeURIComponent(q), 'langs=th,en', 'page_size=20',
+    'fields=product_name,brands,image_front_url,quantity,code',
+  ].join('&'), { headers: { 'User-Agent': OFF_UA, Accept: 'application/json' }, muteHttpExceptions: true });
+  const http = res.getResponseCode();
+  if (http === 429 || http >= 500) fail_('web_img_down', 'Open Food Facts ไม่ว่างชั่วคราว (HTTP ' + http + ') — จะค้นต่อในรอบถัดไป');
+  if (http !== 200) { console.error('Open Food Facts HTTP ' + http + ': ' + res.getContentText().slice(0, 200)); return []; }
+  const d = parseJson_(res.getContentText(), null);
+  if (!d) fail_('web_img_down', 'Open Food Facts ตอบกลับไม่ใช่ JSON — จะค้นต่อในรอบถัดไป');
+  return d.hits || [];
+}
+
+/** ค้นรูปด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive — คืน url หรือ '' (save === false = แค่ดูผล ไม่บันทึก) */
+function fetchWebImage_(z, save) {
+  const want = offParseName_(z.name);
+  const hit = offPickBest_(z.name, num_(z.sizeKg), offSearch_(want.query));
+  if (!hit) return '';
+  if (save === false) return hit.image_front_url + '  (' + hit.product_name + ' ' + (hit.quantity || '') + ')';
+  const blob = downloadImage_(hit.image_front_url.replace(/\.\d+\.jpg$/, '.full.jpg')) || downloadImage_(hit.image_front_url);
+  if (!blob) return '';
+  const ext = blob.getContentType().split('/')[1].replace('jpeg', 'jpg');
+  const file = webImageFolder_().createFile(blob.setName('z' + z.zortId + '.' + ext));
+  file.setDescription('ค้นด้วย: ' + want.query + '\nพบ: ' + hit.product_name + ' / ' + [].concat(hit.brands || []).join(', ') + ' ' + (hit.quantity || '') +
+    '\nจาก: Open Food Facts https://world.openfoodfacts.org/product/' + (hit.code || '') + ' (CC BY-SA)');
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.error(e.message); }
+  return 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w600';
 }
 
 function downloadImage_(url) {
@@ -379,7 +444,6 @@ function downloadImage_(url) {
 
 function webSearchEnabled_() {
   const s = getSettings_();
-  if (!prop_('BRAVE_SEARCH_API_KEY')) return false;
   return s.WEB_IMAGE_SEARCH === undefined || s.WEB_IMAGE_SEARCH === '' || truthy_(s.WEB_IMAGE_SEARCH);
 }
 
@@ -414,12 +478,12 @@ function searchMissingWebImages_(imgStat, startedAt) {
     if (Date.now() - startedAt > 240000) break;                               // งบเวลา 4 นาที (Apps Script จำกัด 6 นาที)
     const r = todo[i];
     const id = String(r.zortId).replace(/^'/, '');
-    const name = String(r.name || '') + (num_(r.sizeKg) ? ' ' + num_(r.sizeKg) + ' กก.' : '');
+    if (searched) Utilities.sleep(1200);                                       // เว้นจังหวะ ไม่ยิงถี่ (บริการฟรี)
     searched++;
     let url = '';
-    try { url = fetchWebImage_({ zortId: id, name: name, fullName: name }); } catch (err) {
+    try { url = fetchWebImage_({ zortId: id, name: String(r.name || ''), sizeKg: r.sizeKg }); } catch (err) {
       console.error('ค้นรูปจากเว็บ: ' + err.message);
-      if (/quota|auth/.test(err.code || '')) break;                             // หยุดค้นรอบนี้
+      if (/down/.test(err.code || '')) break;                                  // บริการล่ม → หยุดรอบนี้ ไม่นับว่าไม่เจอ
       continue;
     }
     if (!url) { miss[id] = now; continue; }
@@ -434,11 +498,12 @@ function searchMissingWebImages_(imgStat, startedAt) {
   props.setProperty('WEB_IMG_MISS', JSON.stringify(miss));
 }
 
-/** ทดสอบค้นรูป 1 ชื่อ — แก้ชื่อในฟังก์ชันแล้วกด Run ดูผลใน Execution log */
+/** ทดสอบค้นรูป (ไม่บันทึกไฟล์) — แก้ชื่อในฟังก์ชันแล้วกด Run ดูผลใน Execution log */
 function testWebImage() {
-  const name = 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.';
-  const url = fetchWebImage_({ zortId: 'test', name: name, fullName: name });
-  console.log(url ? '✅ ได้รูป: ' + url + '  (ไฟล์ z_test ในโฟลเดอร์รูปจากเว็บ ลบทิ้งได้)' : '❌ ไม่พบรูป');
+  ['หงษ์ทอง ข้าวหอมมะลิ 5 กก.', 'ข้าวหอมมะลิ 100% 5 กก.', 'ข้าวกล้องหอมมะลิ 1 กก.', 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.'].forEach(function (name) {
+    const url = fetchWebImage_({ zortId: 'test', name: name, sizeKg: 0 }, false);
+    console.log((url ? '✅ ' : '❌ ไม่พบรูปที่ตรงพอ ') + name + (url ? ' → ' + url : ''));
+  });
 }
 
 /** รันเพื่อดูลิงก์โฟลเดอร์รูปสินค้า */

@@ -498,7 +498,7 @@
       const im = r.images || {};
       R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')' +
         (r.images ? ' · รูป: Drive ' + (im.drive || 0) + ', ZORT ' + (im.zort || 0) + ', จากเว็บ ' + (im.web || 0) + ', ไม่มีรูป ' + (im.none || 0) +
-          (im.none && im.webSearch === false ? ' (ยังไม่ได้ใส่ BRAVE_SEARCH_API_KEY จึงยังไม่ค้นรูปจากเว็บ)' : im.none && im.webSearch ? ' (ค้นต่อในรอบถัดไป)' : '') : ''), 'ok');
+          (im.none && im.webSearch ? ' (หาไม่เจอหรือยังไม่ถึงคิว — วางรูปเองในโฟลเดอร์รูปสินค้าได้)' : '') : ''), 'ok');
       render();
     } catch (e) {
       R.busy(false);
