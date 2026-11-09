@@ -130,14 +130,12 @@
 
   function safetyNote(compact) {
     const items = [
-      'ร้านแจ้งราคาในแชท LINE ของร้าน และในหน้านี้เท่านั้น',
-      'โอนเงินเข้าบัญชีชื่อ <b>' + esc(payeeName()) + '</b> เท่านั้น',
-      'ร้านจะไม่ขอรหัส OTP รหัส ATM หรือรหัสผ่านแอปธนาคารของคุณ',
+      'ทางร้านไม่มีนโยบายขอรหัส OTP รหัส ATM หรือรหัสผ่านแอปธนาคารของท่าน',
     ];
+    if (S.settings.SHOP_PHONE) items.push('หากมีข้อสงสัยเพิ่มเติม สามารถโทรสอบถามได้ที่ ' + phoneLinks());
     return '<aside class="safety' + (compact ? ' compact' : '') + '" aria-label="ข้อควรรู้เพื่อความปลอดภัย">' +
       '<div class="safety-h">' + icon('alert') + '<strong>ข้อควรรู้เพื่อความปลอดภัย</strong></div>' +
       '<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>' +
-      (S.settings.SHOP_PHONE ? '<p>สงสัยอะไร โทรถามร้านได้ที่ ' + phoneLinks() + '</p>' : '') +
       '</aside>';
   }
 
@@ -204,17 +202,17 @@
         helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
-        '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">เลือกข้าว บอกจำนวน แล้วร้านคิดราคาให้</span></span></button>' +
+        '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ และจำนวน แล้วรอร้านแจ้งราคาสักครู่</span></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
-        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ข้าวที่สั่งไว้', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูข้าวที่เคยสั่ง และติดตามว่าถึงไหนแล้ว', badge: pending.length }) +
-        menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่ส่งข้าว' }) +
+        menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่ง และติดตามสถานะการจัดส่ง', badge: pending.length }) +
+        menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่สำหรับจัดส่ง' }) +
         (S.settings.SHOP_PHONE ? '<a class="menu-item call" href="' + telLink() + '"><span class="mi-ic">' + icon('phone') + '</span>' +
-          '<span class="mi-text"><strong>โทรหาร้าน</strong><span class="mi-sub">' + esc(mainPhone()) + (S.settings.SHOP_HOURS ? ' · เปิด ' + esc(S.settings.SHOP_HOURS) : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
+          '<span class="mi-text"><strong>ติดต่อร้าน</strong><span class="mi-sub">' + esc(mainPhone()) + (S.settings.SHOP_HOURS ? ' · เปิด ' + esc(S.settings.SHOP_HOURS) : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
         '</nav>' +
-        '<section class="how"><h2>สั่งข้าวง่าย ๆ 3 ขั้นตอน</h2><ol>' +
-        '<li><b>1</b><span>เลือกข้าวและจำนวนที่ต้องการ</span></li>' +
-        '<li><b>2</b><span>ร้านคิดราคา แล้วส่งมาทาง LINE <small>ยังไม่ต้องจ่ายเงินตอนสั่ง</small></span></li>' +
-        '<li><b>3</b><span>กดยืนยันราคา แล้วจ่ายเงิน หรือจ่ายเงินสดตอนรับข้าว</span></li></ol></section>' +
+        '<section class="how"><h2>ใช้งานง่าย เพียง 3 ขั้นตอน</h2><ol>' +
+        '<li><b>1</b><span>ระบุยี่ห้อ และจำนวนที่ต้องการ</span></li>' +
+        '<li><b>2</b><span>รอทางร้านแจ้งราคาขาย <small>จะตอบกลับผ่านช่องทางนี้เท่านั้น</small></span></li>' +
+        '<li><b>3</b><span>กดยืนยันราคา และชำระเงินออนไลน์ หรือชำระเงินตอนรับสินค้า</span></li></ol></section>' +
         shopCard() + safetyNote(),
     };
   };
@@ -266,7 +264,7 @@
       if (hrs.days.indexOf(day) < 0) continue;
       if (k === 0 && mins >= hrs.open) continue;
       const when = k === 0 ? 'วันนี้' : k === 1 ? 'พรุ่งนี้' : 'วัน' + DAY_TH[day];
-      return { open: false, text: 'ร้านปิดอยู่', sub: 'เปิด' + when + ' ' + hm(hrs.open) + ' · สั่งไว้ก่อนได้เลย' };
+      return { open: false, text: 'ร้านปิดอยู่', sub: 'เปิด' + when + ' ' + hm(hrs.open) + ' · สั่งล่วงหน้าได้เลย' };
     }
     return null;
   }
@@ -823,8 +821,8 @@
       : '<div class="empty">' + icon('receipt') + '<p>ยังไม่เคยสั่งข้าว</p>' +
         '<button type="button" class="btn btn-primary btn-lg" style="margin-top:1rem" data-act="go" data-to="#/shop">สั่งข้าวสาร</button></div>';
     return {
-      back: '#/', top: 'ข้าวที่สั่งไว้',
-      body: '<h1 class="page-title" style="margin-bottom:.9rem">ข้าวที่สั่งไว้</h1>' + list,
+      back: '#/', top: 'ประวัติการสั่ง',
+      body: '<h1 class="page-title" style="margin-bottom:.9rem">ประวัติการสั่ง</h1>' + list,
     };
   };
 
