@@ -94,12 +94,12 @@
     return (R.DEMO ? demoBanner() : '') +
       '<header class="topbar">' +
       (v.back
-        ? '<button type="button" class="tb-back" data-act="go" data-to="' + v.back + '" aria-label="กลับไปหน้าก่อน"><span class="tb-back-ic">' + icon('back') + '</span><span class="tb-back-t">กลับ</span></button>'
+        ? '<button type="button" class="tb-back" data-act="go" data-to="' + v.back + '" aria-label="กลับไปหน้าก่อน">' + icon('back') + '<span>กลับ</span></button>'
         : '<img class="topbar-logo" src="assets/logo-96.png" alt="">') +
       '<h1 class="topbar-title' + (v.back ? ' is-center' : '') + '">' + esc(v.top || shopName()) + '</h1>' +
       '<button type="button" class="tb-size" data-act="size" aria-haspopup="dialog" aria-label="ขนาดตัวอักษร (ตอนนี้: ' + esc(fontSizeLabel()) + ') แตะเพื่อเปลี่ยน">' +
         '<span class="tb-size-g" aria-hidden="true"><span class="g1">ก</span><span class="g2">ก</span></span>' +
-        '<span class="tb-size-t">ขนาดอักษร</span></button>' +
+        '<span class="tb-size-t">ตัวอักษร</span></button>' +
       '</header>' +
       '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + siteFoot() + '</main>' +
       (v.bar ? '<div class="actionbar"><div class="actionbar-in">' + v.bar + '</div></div>' : '');
