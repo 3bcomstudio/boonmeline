@@ -202,7 +202,7 @@
         helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
-        '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ และจำนวน แล้วรอร้านแจ้งราคาสักครู่</span></span></button>' +
+        '<span class="cta-text"><strong>สั่งข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ และจำนวน แล้วรอร้านแจ้งราคา</span></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
         menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่ง และติดตามสถานะการจัดส่ง', badge: pending.length }) +
         menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่สำหรับจัดส่ง' }) +
