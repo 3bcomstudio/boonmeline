@@ -301,6 +301,35 @@ function resolveImage_(z, driveMap) {
   return { url: '', from: 'none' };
 }
 
+function driveFileId_(url) {
+  const m = String(url || '').match(/googleusercontent\.com\/d\/([^=/?]+)/);
+  return m ? m[1] : '';
+}
+
+/**
+ * เลือกรูปตอนดึงสินค้า — สินค้าที่มีรูปอยู่แล้วใช้รูปเดิม ไม่ดึง/ค้นรูปซ้ำ
+ *   1) รูปที่ร้านวางในโฟลเดอร์รูปสินค้า (ตั้งชื่อตาม SKU/ชื่อ) — ใช้ก่อนเสมอ
+ *   2) รูปเดิมในแท็บ Products — ใช้ต่อ ยกเว้นไฟล์ใน Drive ถูกลบไปแล้ว หรือรูปจาก ZORT เปลี่ยน
+ *   3) รูปใน ZORT  4) รูปจากเว็บที่เคยค้นเก็บไว้  5) ไม่มีรูป (ค้นใหม่หลังบันทึก)
+ */
+function pickImage_(z, old, driveMap, webMap, liveIds, listingOk) {
+  const own = resolveImage_(z, driveMap);
+  if (own.from === 'drive') return own;
+  const prev = old && String(old.image || '').trim();
+  if (prev) {
+    const id = driveFileId_(prev);
+    if (id) {
+      if (!listingOk || liveIds[id]) return { url: prev, from: 'kept' };      // ไฟล์ยังอยู่ (หรืออ่านโฟลเดอร์ไม่ได้ — ใช้ของเดิมไว้ก่อน)
+    } else if (!z.image || z.image === prev) {
+      return { url: prev, from: 'kept' };                                     // ลิงก์ภายนอก เช่น รูปจาก ZORT เดิม
+    }
+  }
+  if (z.image) return { url: z.image, from: 'zort' };
+  const web = webMap[imgKey_('z' + z.zortId)];
+  if (web) return { url: web, from: 'web' };
+  return { url: '', from: 'none' };
+}
+
 /* =========================================================
  * รูปจากอินเทอร์เน็ต (ฟรี ไม่ต้องสมัคร ไม่ต้องใช้ key) — ใช้เมื่อไม่มีรูปใน Drive และใน ZORT
  *   1) ค้นรูปสินค้าจริงด้วยชื่อสินค้า + ขนาด ใน Bing Images (รูปถุงจากร้านค้าออนไลน์)
@@ -535,17 +564,6 @@ function webSearchEnabled_() {
   return s.WEB_IMAGE_SEARCH === undefined || s.WEB_IMAGE_SEARCH === '' || truthy_(s.WEB_IMAGE_SEARCH);
 }
 
-/** (ระหว่างล็อก — เร็ว) ใส่รูปจากเว็บที่เคยค้นเก็บไว้แล้ว */
-function applyWebImageCache_(objs, imgStat) {
-  if (!webSearchEnabled_()) return;
-  let cache = {};
-  try { cache = webImageMap_(); } catch (e) { console.error('อ่านโฟลเดอร์รูปจากเว็บไม่ได้: ' + e.message); return; }
-  objs.forEach(function (o) {
-    const url = !o.image && cache[imgKey_('z' + o.zortId)];
-    if (url) { o.image = url; imgStat.none--; imgStat.web++; }
-  });
-}
-
 /**
  * (หลังปลดล็อก — ช้า) ค้นรูปใหม่ให้สินค้าที่ยังไม่มีรูป แล้วบันทึกทีละแถว
  * แยกออกจากช่วงล็อก เพื่อไม่ให้ลูกค้าสั่งข้าวไม่ได้ระหว่างค้นรูป
@@ -648,9 +666,14 @@ function syncZortProducts(opts) {
       else removed++;
     });
 
-    let driveMap = {};
-    try { driveMap = driveImageMap_(); } catch (err) { console.error('อ่านโฟลเดอร์รูปไม่ได้: ' + err.message); }
-    const imgStat = { drive: 0, zort: 0, web: 0, none: 0 };
+    let driveMap = {}, driveOk = true;
+    try { driveMap = driveImageMap_(); } catch (err) { driveOk = false; console.error('อ่านโฟลเดอร์รูปไม่ได้: ' + err.message); }
+    let webMap = {}, webOk = true;
+    try { webMap = webImageMap_(); } catch (err) { webOk = false; console.error('อ่านโฟลเดอร์รูปจากเว็บไม่ได้: ' + err.message); }
+    // ไฟล์รูปใน Drive ที่ยังอยู่ (ใช้ตรวจว่ารูปเดิมของสินค้ายังใช้ได้ — ถ้าถูกลบ จะหารูปใหม่)
+    const liveIds = {};
+    [driveMap, webMap].forEach(function (m) { Object.keys(m).forEach(function (k) { const id = driveFileId_(m[k]); if (id) liveIds[id] = true; }); });
+    const imgStat = { drive: 0, kept: 0, zort: 0, web: 0, none: 0 };
 
     const now = new Date();
     let nextSort = Object.keys(keep).reduce(function (m, k) { return Math.max(m, num_(keep[k].sort)); }, 0) + 1;
@@ -658,7 +681,7 @@ function syncZortProducts(opts) {
     const objs = items.map(function (z) {
       const old = keep[z.zortId];
       if (!old) added++;
-      const img = resolveImage_(z, driveMap);
+      const img = pickImage_(z, old, driveMap, webMap, liveIds, driveOk && webOk);
       imgStat[img.from]++;
       return {
         id: 'z' + z.zortId, name: z.name, detail: z.detail, category: z.category, sizeKg: z.sizeKg, unit: z.unit,
@@ -667,7 +690,6 @@ function syncZortProducts(opts) {
         sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now,
       };
     }).sort(function (a, b) { return a.sort - b.sort; });
-    applyWebImageCache_(objs, imgStat);
     const gone = Object.keys(keep).filter(function (k) {
       return !items.some(function (z) { return z.zortId === k; });
     }).length;
