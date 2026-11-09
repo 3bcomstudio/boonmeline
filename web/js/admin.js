@@ -349,39 +349,66 @@
     const tel = 'tel:' + String(o.phone || '').replace(/\D/g, '');
     const initial = esc(String(o.fullName || o.lineName || '?').trim().charAt(0));
 
-    const itemsRows = (o.items || []).map((i) =>
-      '<tr><td><strong>' + esc(i.name) + '</strong><br><span class="muted">' + esc(i.detail || '') + ' ' + i.sizeKg + ' กก./' + esc(i.unit) + '</span></td>' +
-      '<td class="num">' + i.qty + ' ' + esc(i.unit) + '</td><td class="num">' + (i.qty * i.sizeKg) + ' กก.</td></tr>').join('');
+    const items = o.items || [];
+    const unitSum = {};
+    items.forEach((i) => { unitSum[i.unit] = (unitSum[i.unit] || 0) + (Number(i.qty) || 0); });
+    const unitText = Object.keys(unitSum).map((u) => unitSum[u] + ' ' + u).join(' + ') || '-';
+    const isDelivery = o.deliveryMethod !== 'pickup';
+    const repeat = c.orderCount > 1;
+    const imgOf = (i) => i.image || ((A.products.find((x) => x.id === i.productId) || {}).image) || '';
 
-    return '<div class="d-head">' +
+    const itemsRows = items.map((i) => {
+      const img = imgOf(i);
+      return '<li class="it">' +
+        '<span class="it-img">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : R.sackLoader('2.2rem')) + '</span>' +
+        '<span class="it-b"><b>' + esc(i.name) + '</b><small>' + (i.sizeKg ? i.sizeKg + ' กก. / ' : '') + esc(i.unit) + (i.detail ? ' · ' + esc(i.detail) : '') + '</small></span>' +
+        '<span class="it-q"><b>× ' + i.qty + '</b><small>' + esc(i.unit) + '</small></span>' +
+        '<span class="it-kg">' + money((Number(i.qty) || 0) * (Number(i.sizeKg) || 0)) + ' กก.</span></li>';
+    }).join('');
+
+    const row = (ic, label, val) => '<li><span class="ci-ic">' + icon(ic) + '</span><span class="ci-l">' + label + '</span><span class="ci-v">' + val + '</span></li>';
+
+    return '<div class="d-hero">' +
       '<button type="button" class="btn btn-ghost btn-sm d-back" data-act="close">' + icon('back') + ' รายการ</button>' +
-      '<h2>#' + esc(o.orderId) + '</h2>' + statusPill(o) +
-      '<span class="muted">สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + ' (' + R.ago(o.createdAt) + ')</span></div>' +
+      '<div class="dh-main"><span class="dh-k">คำสั่งซื้อ</span>' +
+      '<div class="dh-id"><h2>#' + esc(o.orderId) + '</h2>' + statusPill(o) + '</div>' +
+      '<span class="dh-time">' + icon('clock') + 'สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + ' · ' + R.ago(o.createdAt) + '</span></div>' +
+      '<div class="dh-chips">' +
+      '<span class="dh-chip">' + icon('rice') + '<b>' + esc(unitText) + '</b><small>' + money(o.totalKg) + ' กก.</small></span>' +
+      '<span class="dh-chip">' + icon(isDelivery ? 'truck' : 'store') + '<b>' + (isDelivery ? 'ส่งถึงที่' : 'มารับที่ร้าน') + '</b><small>' + (isDelivery && o.distanceKm != null ? '~' + o.distanceKm + ' กม.' : isDelivery ? 'จัดส่ง' : 'รับเอง') + '</small></span>' +
+      (o.wantDate ? '<span class="dh-chip">' + icon('calendar') + '<b>' + esc(o.wantDate) + '</b><small>ต้องการรับ</small></span>' : '') +
+      (o.total ? '<span class="dh-chip money">' + icon('cash') + '<b>฿' + money(o.total) + '</b><small>ยอดรวม</small></span>' : '') +
+      '</div></div>' +
       (o.zortVoidStatus === 'pending' ? zortLine(o) : '') +
       '<div class="d-grid">' +
 
-      '<section class="card"><h3>ลูกค้า</h3>' +
-      '<div class="cust"><span class="avatar">' + (c.linePicture ? '<img src="' + esc(c.linePicture) + '" alt="">' : initial) + '</span>' +
-      '<div><strong>' + esc(o.fullName || '-') + '</strong><span class="muted">LINE: ' + esc(o.lineName || '-') + (c.orderCount > 1 ? ' (สั่งครั้งที่ ' + c.orderCount + ')' : ' (ลูกค้าใหม่)') + '</span></div></div>' +
-      '<dl class="kv">' +
-      '<dt>โทร</dt><dd><a href="' + tel + '">' + esc(R.phoneFmt(o.phone)) + '</a></dd>' +
-      '<dt>ซื้อไป</dt><dd><span class="purpose-hl">' + icon(p.icon) + esc(p.label) + '</span>' + (o.purposeNote ? '<br>' + esc(o.purposeNote) : '') + '</dd>' +
-      '<dt>รับข้าว</dt><dd>' + (o.deliveryMethod === 'pickup' ? 'มารับเองที่ร้าน' : 'ส่งถึงที่' + (o.address ? '<br>' + esc(o.address) : '')) + '</dd>' +
-      (o.deliveryMethod === 'delivery' && o.distanceKm != null ? '<dt>ระยะทาง</dt><dd>~' + o.distanceKm + ' กม. จากร้าน (เส้นตรง)</dd>' : '') +
-      (o.wantDate ? '<dt>ต้องการรับ</dt><dd>' + esc(o.wantDate) + '</dd>' : '') +
-      (o.note ? '<dt>หมายเหตุ</dt><dd>' + esc(o.note) + '</dd>' : '') +
-      (o.payMethod ? '<dt>จ่ายเงิน</dt><dd>' + (o.payMethod === 'cod' ? 'เงินสด (ปลายทาง/ที่ร้าน)' : 'โอน / สแกนจ่าย') + '</dd>' : '') +
-      '</dl><div class="links">' +
-      '<a class="btn btn-ghost btn-sm" href="' + tel + '">' + icon('phone') + ' โทร</a>' +
-      (map ? '<a class="btn btn-ghost btn-sm" href="' + map + '" target="_blank" rel="noopener">' + icon('map') + ' แผนที่</a>' : '') +
+      '<section class="card cust-card"><h3>' + icon('user') + 'ลูกค้า</h3>' +
+      '<div class="cust"><span class="avatar">' + (c.linePicture ? '<img src="' + esc(c.linePicture) + '" alt="" referrerpolicy="no-referrer">' : initial) + '</span>' +
+      '<div class="cust-b"><strong>' + esc(o.fullName || o.lineName || '-') + '</strong>' +
+      '<span class="cust-line">LINE: ' + esc(o.lineName || '-') + '</span>' +
+      '<span class="cust-badge ' + (repeat ? 'old' : 'new') + '">' + icon(repeat ? 'repeat' : 'user') + (repeat ? 'ลูกค้าประจำ · สั่งครั้งที่ ' + c.orderCount : 'ลูกค้าใหม่') + '</span></div></div>' +
+      '<ul class="cinfo">' +
+      row('phone', 'โทร', o.phone ? '<a href="' + tel + '">' + esc(R.phoneFmt(o.phone)) + '</a>' : '-') +
+      row(p.icon, 'ซื้อไป', '<span class="purpose-hl">' + esc(p.label) + '</span>' + (o.purposeNote ? '<span class="ci-note">' + esc(o.purposeNote) + '</span>' : '')) +
+      row(isDelivery ? 'truck' : 'store', 'รับข้าว', isDelivery
+        ? 'ส่งถึงที่' + (o.address ? '<span class="ci-note">' + esc(o.address) + '</span>' : '<span class="ci-warn">' + icon('alert') + 'ยังไม่มีที่อยู่ — โทรสอบถามลูกค้า</span>')
+        : 'มารับเองที่ร้าน') +
+      (isDelivery && o.distanceKm != null ? row('map', 'ระยะทาง', '~' + o.distanceKm + ' กม. จากร้าน <span class="muted">(เส้นตรง)</span>') : '') +
+      (o.wantDate ? row('calendar', 'ต้องการรับ', esc(o.wantDate)) : '') +
+      (o.payMethod ? row(o.payMethod === 'cod' ? 'cash' : 'qr', 'ชำระเงิน', o.payMethod === 'cod' ? 'เงินสด (ปลายทาง / ที่ร้าน)' : 'โอน / สแกนจ่าย') : '') +
+      (o.note ? row('chat', 'หมายเหตุ', '<span class="ci-memo">' + esc(o.note) + '</span>') : '') +
+      '</ul><div class="cust-acts">' +
+      (o.phone ? '<a class="btn btn-primary btn-sm" href="' + tel + '">' + icon('phone') + ' โทรหาลูกค้า</a>' : '') +
+      (map ? '<a class="btn btn-ghost btn-sm" href="' + map + '" target="_blank" rel="noopener">' + icon('map') + ' เปิดแผนที่</a>' : '') +
       '</div></section>' +
 
-      '<section class="card"><h3>รายการที่สั่ง</h3><table class="items-t"><thead><tr><th>ข้าว</th><th class="num">จำนวน</th><th class="num">น้ำหนัก</th></tr></thead>' +
-      '<tbody>' + itemsRows + '</tbody><tfoot><tr><td>รวม</td><td class="num">' + o.totalBags + ' หน่วย</td><td class="num">' + o.totalKg + ' กก.</td></tr></tfoot></table></section>' +
+      '<section class="card items-card"><h3>' + icon('receipt') + 'รายการที่สั่ง <span class="h3-n">' + items.length + ' รายการ</span></h3>' +
+      '<ul class="it-list">' + itemsRows + '</ul>' +
+      '<div class="it-sum"><span>รวมทั้งหมด</span><b>' + esc(unitText) + '</b><b class="kg">' + money(o.totalKg) + ' กก.</b></div></section>' +
 
       quoteCard(o) + actionCard(o) +
 
-      '<section class="card span2"><h3>ประวัติ</h3><ul class="hist">' +
+      '<section class="card span2"><h3>' + icon('clock') + 'ประวัติ</h3><ul class="hist">' +
       (o.history || []).slice().reverse().map((h) =>
         '<li><time>' + R.dateTH(h.at, true) + '</time><span><strong>' + esc((R.ADMIN_STATUS[h.status] || {}).label || h.status) + '</strong>' +
         ' โดย ' + esc(String(h.by || '').replace(/^admin:/, 'แอดมิน ').replace('customer', 'ลูกค้า')) + (h.note ? ' — ' + esc(h.note) : '') + '</span></li>').join('') +
@@ -422,7 +449,7 @@
     if (!editable) {
       if (!o.quote) return '';
       const q = o.quote;
-      return '<section class="card span2"><h3>ราคาที่แจ้งลูกค้า</h3><table class="q-table"><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th></tr></thead><tbody>' +
+      return '<section class="card span2"><h3>' + icon('cash') + 'ราคาที่แจ้งลูกค้า</h3><table class="q-table"><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th></tr></thead><tbody>' +
         q.lines.map((l) => '<tr><td>' + esc(l.name) + (l.sizeKg ? ' ' + l.sizeKg + ' กก.' : '') + '</td><td class="num">' + l.qty + ' ' + esc(l.unit) + '</td><td class="num">฿' + money(l.unitPrice) + '</td><td class="num">฿' + money(l.amount) + '</td></tr>').join('') +
         '</tbody></table><dl class="kv" style="margin-top:.6rem"><dt>ค่าส่ง</dt><dd>฿' + money(q.shippingFee) + '</dd><dt>ส่วนลด</dt><dd>฿' + money(q.discount) + '</dd>' + (q.note ? '<dt>ข้อความ</dt><dd>' + esc(q.note) + '</dd>' : '') + '</dl>' +
         '<div class="q-total"><span>ยอดรวม</span><b>฿' + money(q.total) + '</b></div></section>';
@@ -432,7 +459,7 @@
     const sug = suggestShip(o);
     const wholesale = o.purpose === 'restaurant' || o.purpose === 'wholesale';
     const title = o.status === 'new' ? 'คิดราคาแล้วส่งให้ลูกค้า' : 'แก้ราคา แล้วส่งใหม่';
-    return '<section class="card span2" id="quote-card"><h3>' + title + '</h3>' +
+    return '<section class="card span2" id="quote-card"><h3>' + icon('cash') + title + '</h3>' +
       '<p class="tier">ราคาตั้งต้นจากแท็บ Products: ' + (wholesale ? 'ราคาส่ง (ลูกค้า' + esc(R.purposeOf(o.purpose).label) + ')' : 'ราคาปลีก') + ' แก้ได้ทุกช่อง</p>' +
       '<table class="q-table"><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th></tr></thead><tbody>' +
       d.lines.map((l, i) =>
@@ -498,7 +525,7 @@
     const slip = o.slipUrl
       ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>'
       : '';
-    return '<section class="card span2"><h3>ขั้นตอนถัดไป</h3>' + slip +
+    return '<section class="card span2"><h3>' + icon('bell') + 'ขั้นตอนถัดไป</h3>' + slip +
       (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
       '<div class="act-list">' + acts.map((a) =>
         '<button type="button" class="btn btn-' + a[2] + ' btn-block" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
