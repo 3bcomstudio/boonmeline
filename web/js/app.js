@@ -19,7 +19,8 @@
   let payChoice = {};   // วิธีจ่ายเงินที่เลือก ต่อคำสั่งซื้อ
 
   /* ---------- ขนาดตัวอักษร ---------- */
-  const SIZES = [{ id: 'm', label: 'ปกติ' }, { id: 'l', label: 'ใหญ่' }, { id: 'xl', label: 'ใหญ่มาก' }];
+  const SIZES = [{ id: 'm', label: 'ปกติ', px: 18 }, { id: 'l', label: 'ใหญ่', px: 20 }, { id: 'xl', label: 'ใหญ่มาก', px: 23 }];
+  const fontSizeLabel = () => (SIZES.find((x) => x.id === (document.documentElement.dataset.size || 'l')) || SIZES[1]).label;
   const applySize = (id) => { document.documentElement.dataset.size = id; R.storage('rice_size', id); };
   applySize(R.storage('rice_size') || 'l');
 
@@ -92,9 +93,13 @@
   function shell(v) {
     return (R.DEMO ? demoBanner() : '') +
       '<header class="topbar">' +
-      (v.back ? '<button type="button" class="topbar-btn" data-act="go" data-to="' + v.back + '">' + icon('back') + '<span>ย้อนกลับ</span></button>' : '<img class="topbar-logo" src="assets/logo-96.png" alt="">') +
-      '<div class="topbar-title">' + esc(v.top || shopName()) + '</div>' +
-      '<button type="button" class="topbar-btn size-btn" data-act="size" aria-label="ปรับขนาดตัวอักษร"><span class="sz-glyph" aria-hidden="true"><small>ก</small>ก</span><span class="sz-label">ตัวอักษร</span></button>' +
+      (v.back
+        ? '<button type="button" class="tb-back" data-act="go" data-to="' + v.back + '" aria-label="กลับไปหน้าก่อน"><span class="tb-back-ic">' + icon('back') + '</span><span class="tb-back-t">กลับ</span></button>'
+        : '<img class="topbar-logo" src="assets/logo-96.png" alt="">') +
+      '<h1 class="topbar-title' + (v.back ? ' is-center' : '') + '">' + esc(v.top || shopName()) + '</h1>' +
+      '<button type="button" class="tb-size" data-act="size" aria-haspopup="dialog" aria-label="ขนาดตัวอักษร (ตอนนี้: ' + esc(fontSizeLabel()) + ') แตะเพื่อเปลี่ยน">' +
+        '<span class="tb-size-g" aria-hidden="true"><span class="g1">ก</span><span class="g2">ก</span></span>' +
+        '<span class="tb-size-t">ขนาดอักษร</span></button>' +
       '</header>' +
       '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + siteFoot() + '</main>' +
       (v.bar ? '<div class="actionbar"><div class="actionbar-in">' + v.bar + '</div></div>' : '');
@@ -395,6 +400,57 @@
   }
 
   /** แผ่นเลือกตัวกรอง — แสดงจำนวนข้าวของแต่ละตัวเลือก (ตามตัวกรองอื่นที่เลือกอยู่) */
+  /** แผ่นเลือกขนาดตัวอักษร: 3 ตัวเลือกใหญ่ เห็นตัวอย่างขนาดจริง แตะแล้วเปลี่ยนทันที */
+  function openSizeSheet() {
+    const cur = document.documentElement.dataset.size || 'l';
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap';
+    wrap.innerHTML = '<div class="modal sheet size-sheet" role="dialog" aria-modal="true" aria-labelledby="size-title">' +
+      '<div class="sheet-head"><h2 id="size-title" class="modal-title">ขนาดตัวอักษร</h2>' +
+      '<button type="button" class="sheet-x" data-x aria-label="ปิด">' + icon('x') + '</button></div>' +
+      '<p class="size-hint">เลือกขนาดที่อ่านสบายตา เปลี่ยนได้ตลอดเวลา</p>' +
+      '<div class="size-list" role="radiogroup" aria-labelledby="size-title">' + SIZES.map((x) => {
+        const sel = x.id === cur;
+        return '<button type="button" class="size-opt' + (sel ? ' is-sel' : '') + '" role="radio" aria-checked="' + sel + '" data-size="' + x.id + '">' +
+          '<span class="size-radio" aria-hidden="true">' + (sel ? icon('check') : '') + '</span>' +
+          '<span class="size-body"><span class="size-name">' + x.label + '</span>' +
+          '<span class="size-sample" style="font-size:' + x.px + 'px">ข้าวหอมมะลิ 5 กก.</span></span></button>';
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-primary btn-block size-done" data-x>เสร็จแล้ว</button></div>';
+
+    const close = () => {
+      wrap.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => wrap.remove(), 180);
+      const btn = document.querySelector('.tb-size');
+      if (btn) btn.focus({ preventScroll: true });
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    wrap.addEventListener('click', (e) => {
+      const o = e.target.closest('.size-opt');
+      if (o) {
+        applySize(o.dataset.size);
+        wrap.querySelectorAll('.size-opt').forEach((b) => {
+          const on = b === o;
+          b.classList.toggle('is-sel', on);
+          b.setAttribute('aria-checked', on);
+          b.querySelector('.size-radio').innerHTML = on ? icon('check') : '';
+        });
+        const tb = document.querySelector('.tb-size');
+        if (tb) tb.setAttribute('aria-label', 'ขนาดตัวอักษร (ตอนนี้: ' + fontSizeLabel() + ') แตะเพื่อเปลี่ยน');
+        return;
+      }
+      if (e.target === wrap || e.target.closest('[data-x]')) close();
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => {
+      wrap.classList.add('show');
+      const sel = wrap.querySelector('.size-opt.is-sel');
+      if (sel) sel.focus({ preventScroll: true });
+    });
+  }
+
   function openFilterSheet(key) {
     const f = FILTERS.find((x) => x.key === key);
     const pool = filtered(key);
@@ -1057,13 +1113,7 @@
     const act = el.dataset.act, id = el.dataset.id;
     switch (act) {
       case 'go': go(el.dataset.to); break;
-      case 'size': {
-        const cur = document.documentElement.dataset.size || 'l';
-        const next = SIZES[(SIZES.findIndex((s) => s.id === cur) + 1) % SIZES.length];
-        applySize(next.id);
-        R.toast('ขนาดตัวอักษร: ' + next.label);
-        break;
-      }
+      case 'size': openSizeSheet(); break;
       case 'fsheet': openFilterSheet(el.dataset.k); break;
       case 'variant': {
         const v = productById(id);
