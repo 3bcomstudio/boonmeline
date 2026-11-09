@@ -378,9 +378,9 @@
       '<span class="dh-chip">' + icon(isDelivery ? 'truck' : 'store') + '<b>' + (isDelivery ? 'ส่งถึงที่' : 'มารับที่ร้าน') + '</b><small>' + (isDelivery && o.distanceKm != null ? '~' + o.distanceKm + ' กม.' : isDelivery ? 'จัดส่ง' : 'รับเอง') + '</small></span>' +
       (o.wantDate ? '<span class="dh-chip">' + icon('calendar') + '<b>' + esc(o.wantDate) + '</b><small>ต้องการรับ</small></span>' : '') +
       (o.total ? '<span class="dh-chip money">' + icon('cash') + '<b>฿' + money(o.total) + '</b><small>ยอดรวม</small></span>' : '') +
-      '</div></div>' +
+      '</div>' + stepper(o) + '</div>' +
       (o.zortVoidStatus === 'pending' ? zortLine(o) : '') +
-      '<div class="d-grid">' +
+      '<div class="d-grid">' + actionCard(o) +
 
       '<section class="card cust-card"><h3>' + icon('user') + 'ลูกค้า</h3>' +
       '<div class="cust"><span class="avatar">' + (c.linePicture ? '<img src="' + esc(c.linePicture) + '" alt="" referrerpolicy="no-referrer">' : initial) + '</span>' +
@@ -406,12 +406,13 @@
       '<ul class="it-list">' + itemsRows + '</ul>' +
       '<div class="it-sum"><span>รวมทั้งหมด</span><b>' + esc(unitText) + '</b><b class="kg">' + money(o.totalKg) + ' กก.</b></div></section>' +
 
-      quoteCard(o) + actionCard(o) +
+      quoteCard(o) +
 
-      '<section class="card span2"><h3>' + icon('clock') + 'ประวัติ</h3><ul class="hist">' +
-      (o.history || []).slice().reverse().map((h) =>
-        '<li><time>' + R.dateTH(h.at, true) + '</time><span><strong>' + esc((R.ADMIN_STATUS[h.status] || {}).label || h.status) + '</strong>' +
-        ' โดย ' + esc(String(h.by || '').replace(/^admin:/, 'แอดมิน ').replace('customer', 'ลูกค้า')) + (h.note ? ' — ' + esc(h.note) : '') + '</span></li>').join('') +
+      '<section class="card span2"><h3>' + icon('clock') + 'ประวัติคำสั่งซื้อ</h3><ul class="tline">' +
+      (o.history || []).slice().reverse().map((h, i) =>
+        '<li class="' + (i === 0 ? 'latest' : '') + '"><span class="tl-dot"></span><div class="tl-b"><b>' + esc((R.ADMIN_STATUS[h.status] || {}).label || h.status) + '</b>' +
+        (h.note ? '<p>' + esc(h.note) + '</p>' : '') +
+        '<small>' + R.dateTH(h.at, true) + ' · โดย ' + esc(String(h.by || '').replace(/^admin:/, 'แอดมิน ').replace('customer', 'ลูกค้า')) + '</small></div></li>').join('') +
       '</ul></section></div>';
   }
 
@@ -449,34 +450,96 @@
     if (!editable) {
       if (!o.quote) return '';
       const q = o.quote;
-      return '<section class="card span2"><h3>' + icon('cash') + 'ราคาที่แจ้งลูกค้า</h3><table class="q-table"><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th></tr></thead><tbody>' +
-        q.lines.map((l) => '<tr><td>' + esc(l.name) + (l.sizeKg ? ' ' + l.sizeKg + ' กก.' : '') + '</td><td class="num">' + l.qty + ' ' + esc(l.unit) + '</td><td class="num">฿' + money(l.unitPrice) + '</td><td class="num">฿' + money(l.amount) + '</td></tr>').join('') +
-        '</tbody></table><dl class="kv" style="margin-top:.6rem"><dt>ค่าส่ง</dt><dd>฿' + money(q.shippingFee) + '</dd><dt>ส่วนลด</dt><dd>฿' + money(q.discount) + '</dd>' + (q.note ? '<dt>ข้อความ</dt><dd>' + esc(q.note) + '</dd>' : '') + '</dl>' +
-        '<div class="q-total"><span>ยอดรวม</span><b>฿' + money(q.total) + '</b></div></section>';
+      return '<section class="card span2 receipt"><h3>' + icon('cash') + 'ราคาที่แจ้งลูกค้า' + (o.quotedAt ? '<span class="h3-n">แจ้งเมื่อ ' + R.dateTH(o.quotedAt, true) + '</span>' : '') + '</h3>' +
+        '<div class="rc-lines">' + q.lines.map((l) =>
+          '<div class="rc-l"><span><b>' + esc(l.name) + '</b><small>' + l.qty + ' ' + esc(l.unit) + (l.sizeKg ? ' × ' + l.sizeKg + ' กก.' : '') + ' · ฿' + money(l.unitPrice) + '/' + esc(l.unit) + '</small></span><b>฿' + money(l.amount) + '</b></div>').join('') + '</div>' +
+        '<div class="sum-rows"><div><span>ราคาสินค้า</span><b>฿' + money(q.subtotal != null ? q.subtotal : q.lines.reduce((x, l) => x + (l.amount || 0), 0)) + '</b></div>' +
+        '<div><span>ค่าส่ง</span><b>' + (q.shippingFee ? '฿' + money(q.shippingFee) : 'ฟรี') + '</b></div>' +
+        (q.discount ? '<div class="disc"><span>ส่วนลด</span><b>−฿' + money(q.discount) + '</b></div>' : '') + '</div>' +
+        '<div class="sum-total"><span>ยอดที่ลูกค้าต้องชำระ</span><b>฿' + money(q.total) + '</b></div>' +
+        (q.note ? '<p class="rc-note">' + icon('chat') + esc(q.note) + '</p>' : '') + '</section>';
     }
     const d = getDraft(o);
     const t = draftTotal(d);
     const sug = suggestShip(o);
     const wholesale = o.purpose === 'restaurant' || o.purpose === 'wholesale';
-    const title = o.status === 'new' ? 'คิดราคาแล้วส่งให้ลูกค้า' : 'แก้ราคา แล้วส่งใหม่';
-    return '<section class="card span2" id="quote-card"><h3>' + icon('cash') + title + '</h3>' +
-      '<p class="tier">ราคาตั้งต้นจากแท็บ Products: ' + (wholesale ? 'ราคาส่ง (ลูกค้า' + esc(R.purposeOf(o.purpose).label) + ')' : 'ราคาปลีก') + ' แก้ได้ทุกช่อง</p>' +
-      '<table class="q-table"><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th></tr></thead><tbody>' +
+    const resend = o.status !== 'new';
+    const stepH = (n, title, hint) => '<div class="qf-h"><span class="qf-n">' + n + '</span><div><b>' + title + '</b>' + (hint ? '<small>' + hint + '</small>' : '') + '</div></div>';
+    return '<section class="card span2 qform" id="quote-card">' +
+      '<div class="qf-top"><h3>' + icon('cash') + (resend ? 'แก้ราคา แล้วส่งใหม่' : 'แจ้งราคาให้ลูกค้า') + '</h3>' +
+      '<span class="qf-tier">' + icon('receipt') + 'ราคาตั้งต้น: ' + (wholesale ? 'ราคาส่ง (' + esc(R.purposeOf(o.purpose).label) + ')' : 'ราคาปลีก') + '</span></div>' +
+      '<div class="qf-grid"><div class="qf-steps">' +
+
+      '<div class="qf-step">' + stepH(1, 'ตรวจจำนวนและราคาต่อหน่วย', 'แก้ได้ทุกช่อง ราคารวมคำนวณให้อัตโนมัติ') +
+      '<div class="ql-head"><span>สินค้า</span><span>จำนวน</span><span>ราคา/หน่วย</span><span>รวม</span></div>' +
       d.lines.map((l, i) =>
-        '<tr><td><strong>' + esc(l.name) + '</strong>' + (l.sizeKg ? '<br><span class="muted">' + l.sizeKg + ' กก./' + esc(l.unit) + '</span>' : '') + '</td>' +
-        '<td class="qcol"><input type="number" min="0" inputmode="numeric" data-q="qty" data-i="' + i + '" value="' + l.qty + '" aria-label="จำนวน ' + esc(l.name) + '"></td>' +
-        '<td class="pcol"><input type="number" min="0" step="0.01" inputmode="decimal" data-q="unitPrice" data-i="' + i + '" value="' + l.unitPrice + '" aria-label="ราคาต่อหน่วย ' + esc(l.name) + '"></td>' +
-        '<td class="num" id="amt-' + i + '">฿' + money((Number(l.qty) || 0) * (Number(l.unitPrice) || 0)) + '</td></tr>').join('') +
-      '</tbody></table>' +
-      '<div class="q-extra">' +
-      '<label>ค่าส่ง (บาท)<input type="number" min="0" inputmode="decimal" data-q="shippingFee" value="' + d.shippingFee + '">' +
-      (sug ? '<span class="q-hint">แนะนำ ฿' + money(sug.fee) + ' (' + esc(sug.why) + ')' + (Number(d.shippingFee) !== sug.fee ? ' <button type="button" data-act="use-ship" data-v="' + sug.fee + '">ใช้ค่านี้</button>' : '') + '</span>' : '') + '</label>' +
-      '<label>ส่วนลด (บาท)<input type="number" min="0" inputmode="decimal" data-q="discount" value="' + d.discount + '"></label>' +
-      '<label class="full">ข้อความถึงลูกค้า (ไม่บังคับ)<input type="text" maxlength="300" data-q="note" value="' + esc(d.note) + '" placeholder="เช่น ส่งได้พรุ่งนี้เช้า / ลดให้เพราะทำบุญ"></label>' +
+        '<div class="ql">' +
+        '<span class="ql-name"><b>' + esc(l.name) + '</b>' + (l.sizeKg ? '<small>' + l.sizeKg + ' กก. / ' + esc(l.unit) + '</small>' : '') + '</span>' +
+        '<label class="fld"><span class="fld-l">จำนวน</span><span class="inp"><input type="number" min="0" inputmode="numeric" data-q="qty" data-i="' + i + '" value="' + l.qty + '" aria-label="จำนวน ' + esc(l.name) + '"><em>' + esc(l.unit) + '</em></span></label>' +
+        '<label class="fld"><span class="fld-l">ราคา/หน่วย</span><span class="inp pre"><i>฿</i><input type="number" min="0" step="0.01" inputmode="decimal" data-q="unitPrice" data-i="' + i + '" value="' + l.unitPrice + '" aria-label="ราคาต่อหน่วย ' + esc(l.name) + '"></span></label>' +
+        '<span class="ql-amt" id="amt-' + i + '">฿' + money((Number(l.qty) || 0) * (Number(l.unitPrice) || 0)) + '</span></div>').join('') +
       '</div>' +
-      '<div class="q-total"><span>ยอดที่ลูกค้าต้องจ่าย</span><b id="q-total">฿' + money(t.total) + '</b></div>' +
-      '<button type="button" class="btn btn-go btn-lg btn-block" data-act="send-quote">' + icon('chat') + (o.status === 'new' ? ' ส่งราคาให้ลูกค้าทาง LINE' : ' ส่งราคาใหม่ให้ลูกค้า') + '</button>' +
-      '</section>';
+
+      '<div class="qf-step">' + stepH(2, 'ค่าส่งและส่วนลด', o.deliveryMethod === 'pickup' ? 'ลูกค้ามารับเองที่ร้าน' : (o.distanceKm != null ? 'ระยะทางประมาณ ' + o.distanceKm + ' กม. จากร้าน' : '')) +
+      '<div class="qf-2">' +
+      '<label class="fld"><span class="fld-l">ค่าส่ง</span><span class="inp pre"><i>฿</i><input type="number" min="0" inputmode="decimal" data-q="shippingFee" value="' + d.shippingFee + '"></span>' +
+      (sug ? '<span class="sug">' + icon('truck') + 'แนะนำ <b>฿' + money(sug.fee) + '</b> <small>(' + esc(sug.why) + ')</small>' + (Number(d.shippingFee) !== sug.fee ? '<button type="button" data-act="use-ship" data-v="' + sug.fee + '">ใช้ค่านี้</button>' : '') + '</span>' : '') + '</label>' +
+      '<label class="fld"><span class="fld-l">ส่วนลด</span><span class="inp pre"><i>฿</i><input type="number" min="0" inputmode="decimal" data-q="discount" value="' + d.discount + '"></span></label>' +
+      '</div></div>' +
+
+      '<div class="qf-step">' + stepH(3, 'ข้อความถึงลูกค้า', 'ไม่บังคับ — แสดงใต้ราคาในข้อความ LINE') +
+      '<textarea class="txt" rows="2" maxlength="300" data-q="note" placeholder="เช่น ส่งได้พรุ่งนี้เช้า / ลดให้เพราะทำบุญ">' + esc(d.note) + '</textarea></div>' +
+      '</div>' +
+
+      '<aside class="qf-sum"><div class="qs-h">สรุปยอด</div>' +
+      '<div class="sum-rows"><div><span>ราคาสินค้า</span><b id="q-sub">฿' + money(t.sub) + '</b></div>' +
+      '<div><span>ค่าส่ง</span><b id="q-ship">' + (Number(d.shippingFee) ? '฿' + money(d.shippingFee) : 'ฟรี') + '</b></div>' +
+      '<div class="disc"><span>ส่วนลด</span><b id="q-disc">' + (Number(d.discount) ? '−฿' + money(d.discount) : '-') + '</b></div></div>' +
+      '<div class="sum-total"><span>ยอดที่ลูกค้าต้องชำระ</span><b id="q-total">฿' + money(t.total) + '</b></div>' +
+      '<button type="button" class="btn btn-go btn-lg btn-block" data-act="send-quote">' + icon('chat') + (resend ? ' ส่งราคาใหม่ให้ลูกค้า' : ' ส่งราคาให้ลูกค้าทาง LINE') + '</button>' +
+      '<p class="qs-note">' + icon('check') + 'ลูกค้าจะได้ข้อความใน LINE พร้อมปุ่มยืนยันราคา</p></aside>' +
+      '</div></section>';
+  }
+
+  /** หัวข้อสั้น ๆ ว่าต้องทำอะไรต่อ */
+  function nextTitle(o) {
+    const pickup = o.deliveryMethod === 'pickup';
+    switch (o.status) {
+      case 'new': return 'แจ้งราคาให้ลูกค้า';
+      case 'quoted': return 'รอลูกค้ากดยืนยันราคา';
+      case 'confirmed': return o.payMethod === 'cod' ? (pickup ? 'รอลูกค้ามารับข้าว และชำระเงินสด' : 'จัดส่งข้าว และเก็บเงินสดปลายทาง') : 'รอลูกค้าโอนเงิน';
+      case 'slip': return 'ตรวจสลิปการโอนเงิน';
+      case 'paid': return pickup ? 'เตรียมข้าวให้ลูกค้ามารับ' : 'จัดส่งข้าวให้ลูกค้า';
+      case 'shipping': return pickup ? 'รอลูกค้ามารับข้าว' : 'กำลังจัดส่ง — ยืนยันเมื่อลูกค้าได้รับ';
+      case 'done': return 'คำสั่งซื้อเสร็จสมบูรณ์';
+      case 'cancelled': return 'คำสั่งซื้อถูกยกเลิก';
+    }
+    return '';
+  }
+
+  /** แถบความคืบหน้า 6 ขั้น */
+  function stepper(o) {
+    const pickup = o.deliveryMethod === 'pickup';
+    const cod = o.payMethod === 'cod';
+    const steps = [
+      ['รับคำสั่งซื้อ', o.createdAt],
+      ['แจ้งราคา', o.quotedAt],
+      ['ลูกค้ายืนยัน', o.confirmedAt],
+      [cod ? 'ชำระเงินสด' : 'ชำระเงิน', o.paidAt || o.slipAt],
+      [pickup ? 'ลูกค้ามารับ' : 'จัดส่ง', o.shippedAt],
+      ['สำเร็จ', o.doneAt],
+    ];
+    const cur = { new: 1, quoted: 2, confirmed: cod ? 4 : 3, slip: 3, paid: 4, shipping: 4, done: 6 }[o.status];
+    if (o.status === 'cancelled') {
+      return '<div class="stepper cancelled">' + icon('x') + '<span><b>ยกเลิกแล้ว</b>' + (o.cancelReason ? ' — ' + esc(o.cancelReason) : '') + '</span></div>';
+    }
+    return '<ol class="stepper">' + steps.map((st, i) => {
+      const state = i < cur ? 'done' : i === cur ? 'now' : 'todo';
+      const skipped = state === 'done' && !st[1] && i > 0;
+      return '<li class="st ' + state + '"><span class="st-dot">' + (state === 'done' ? icon('check') : i + 1) + '</span>' +
+        '<span class="st-t">' + st[0] + '</span>' +
+        '<span class="st-d">' + (state === 'done' && st[1] ? R.dateTH(st[1], true) : state === 'now' ? 'ขั้นตอนนี้' : skipped ? '—' : '') + '</span></li>';
+    }).join('') + '</ol>';
   }
 
   function actionCard(o) {
@@ -486,7 +549,8 @@
     const shipLabel = pickup ? 'ข้าวพร้อมให้มารับ' : 'เริ่มจัดส่ง';
     switch (o.status) {
       case 'new':
-        note = 'กรอกราคาด้านบน แล้วกดส่ง ลูกค้าจะได้ข้อความใน LINE พร้อมปุ่มยืนยัน';
+        note = 'ตรวจจำนวนและราคาในฟอร์ม "แจ้งราคาให้ลูกค้า" ด้านล่าง แล้วกดส่ง ลูกค้าจะได้ข้อความใน LINE พร้อมปุ่มยืนยัน';
+        acts.push(['#quote', 'ไปที่ฟอร์มแจ้งราคา', 'primary']);
         break;
       case 'quoted':
         note = 'ส่งราคาแล้ว ' + R.ago(o.quotedAt) + ' รอลูกค้ากดยืนยัน ถ้าลูกค้ายืนยันทางโทรศัพท์ กดปุ่มด้านล่างแทนได้';
@@ -525,12 +589,19 @@
     const slip = o.slipUrl
       ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>'
       : '';
-    return '<section class="card span2"><h3>' + icon('bell') + 'ขั้นตอนถัดไป</h3>' + slip +
-      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
-      '<div class="act-list">' + acts.map((a) =>
-        '<button type="button" class="btn btn-' + a[2] + ' btn-block" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
-        (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + (a[3] && a[3].zortWarn ? ' data-zortwarn="1"' : '') + '>' + esc(a[1]) + '</button>').join('') +
-      '</div></section>';
+    const main = acts.filter((a) => a[2] !== 'danger');
+    const danger = acts.filter((a) => a[2] === 'danger');
+    const btn = (a) => a[0] === '#quote'
+      ? '<button type="button" class="btn btn-' + a[2] + '" data-act="to-quote">' + icon('chevron') + esc(a[1]) + '</button>'
+      : '<button type="button" class="btn btn-' + a[2] + '" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
+        (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + (a[3] && a[3].zortWarn ? ' data-zortwarn="1"' : '') + '>' + esc(a[1]) + '</button>';
+    const tone = o.status === 'cancelled' ? 'is-cancel' : o.status === 'done' ? 'is-done' : 'is-todo';
+    return '<section class="card span2 nextcard ' + tone + '"><div class="nx-h"><span class="nx-ic">' + icon(o.status === 'done' ? 'check' : o.status === 'cancelled' ? 'x' : 'bell') + '</span>' +
+      '<div><small>' + (o.status === 'done' || o.status === 'cancelled' ? 'สถานะ' : 'สิ่งที่ต้องทำตอนนี้') + '</small><b>' + esc(nextTitle(o)) + '</b></div></div>' +
+      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + slip + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
+      (main.length ? '<div class="nx-acts">' + main.map(btn).join('') + '</div>' : '') +
+      (danger.length ? '<div class="nx-danger">' + danger.map((a) => btn(a).replace('btn btn-danger', 'btn btn-ghost btn-sm danger-link')).join('') + '</div>' : '') +
+      '</section>';
   }
 
   /** สถานะการบันทึกยอดขายใน ZORT (แสดงเมื่อปิดการขายแล้ว) */
@@ -806,6 +877,11 @@
       case 'zort-push': zortPushOrder(); break;
       case 'zort-void-done': zortVoidDone(); break;
       case 'send-quote': sendQuote(); break;
+      case 'to-quote': {
+        const qc = document.getElementById('quote-card');
+        if (qc) { qc.scrollIntoView({ behavior: 'smooth', block: 'start' }); const f = qc.querySelector('input'); if (f) setTimeout(() => f.focus({ preventScroll: true }), 400); }
+        break;
+      }
       case 'use-ship': {
         const o = A.orders.find((x) => x.orderId === A.sel);
         getDraft(o).shippingFee = Number(el.dataset.v);
@@ -829,7 +905,12 @@
       const l = d.lines[i];
       document.getElementById('amt-' + i).textContent = '฿' + money((Number(l.qty) || 0) * (Number(l.unitPrice) || 0));
     } else d[k] = e.target.value;
-    document.getElementById('q-total').textContent = '฿' + money(draftTotal(d).total);
+    const t = draftTotal(d);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('q-sub', '฿' + money(t.sub));
+    set('q-ship', Number(d.shippingFee) ? '฿' + money(d.shippingFee) : 'ฟรี');
+    set('q-disc', Number(d.discount) ? '−฿' + money(d.discount) : '-');
+    set('q-total', '฿' + money(t.total));
   });
 
   /* ---------- เริ่มต้น / สิทธิ์แอดมิน ---------- */
