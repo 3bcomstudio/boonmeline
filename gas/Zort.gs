@@ -406,27 +406,91 @@ function offSearch_(query) {
     'fields=product_name,brands,image_front_url,quantity,code',
   ].join('&'), { headers: { 'User-Agent': OFF_UA, Accept: 'application/json' }, muteHttpExceptions: true });
   const http = res.getResponseCode();
-  if (http === 429 || http >= 500) fail_('web_img_down', 'Open Food Facts ไม่ว่างชั่วคราว (HTTP ' + http + ') — จะค้นต่อในรอบถัดไป');
-  if (http !== 200) { console.error('Open Food Facts HTTP ' + http + ': ' + res.getContentText().slice(0, 200)); return []; }
+  if (http !== 200) fail_('web_img_down', 'Open Food Facts ใช้งานไม่ได้ตอนนี้ (HTTP ' + http + ')');
   const d = parseJson_(res.getContentText(), null);
-  if (!d) fail_('web_img_down', 'Open Food Facts ตอบกลับไม่ใช่ JSON — จะค้นต่อในรอบถัดไป');
+  if (!d) fail_('web_img_down', 'Open Food Facts ตอบกลับผิดรูปแบบ');
   return d.hits || [];
 }
 
-/** ค้นรูปด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive — คืน url หรือ '' (save === false = แค่ดูผล ไม่บันทึก) */
-function fetchWebImage_(z, save) {
-  const want = offParseName_(z.name);
-  const hit = offPickBest_(z.name, num_(z.sizeKg), offSearch_(want.query));
-  if (!hit) return '';
-  if (save === false) return hit.image_front_url + '  (' + hit.product_name + ' ' + (hit.quantity || '') + ')';
-  const blob = downloadImage_(hit.image_front_url.replace(/\.\d+\.jpg$/, '.full.jpg')) || downloadImage_(hit.image_front_url);
-  if (!blob) return '';
+/*
+ * ภาพประกอบตามชนิดข้าว (Wikimedia Commons — ฟรี ไม่ต้องใช้ key) ใช้เมื่อหารูปถุงยี่ห้อตรงไม่เจอ
+ * เป็นรูปเมล็ดข้าว ไม่ใช่รูปถุงยี่ห้ออื่น จึงไม่ทำให้ลูกค้าเข้าใจผิดเรื่องยี่ห้อ (เลือกรูปไว้ล่วงหน้า ตรวจแล้วว่าเป็นข้าวสาร)
+ */
+const RICE_TYPE_PHOTOS = [
+  [/ไรซ์เบอร์รี่|ไรซ์เบอรี่|riceberry|ข้าวดำ|ข้าวก่ำ|เหนียวดำ|black/i, 'File:RiceberryWhoelGrain.jpg', 'ข้าวไรซ์เบอร์รี่/ข้าวดำ'],
+  [/สามสี|ข้าวแดง|หอมแดง|มันปู|สังข์หยด|ข้าวสี|ข้าวผสม|mixed|red/i, 'File:Uncooked brown, red and black rice.jpg', 'ข้าวสี/ข้าวผสม'],
+  [/กล้อง|brown/i, 'File:Brown Rice.jpg', 'ข้าวกล้อง'],
+  [/เหนียว|glutinous|sticky/i, 'File:2014 uncooked Thai glutinous rice.jpg', 'ข้าวเหนียว'],
+  [/มะลิ|jasmine|หอม/i, 'File:Thai jasmine rice uncooked.jpg', 'ข้าวหอมมะลิ'],
+  [/./, 'File:Uncooked ST25 rice on bamboo surface.jpg', 'ข้าวสาร'],
+];
+const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
+let COMMONS_MEMO_ = {};
+
+function riceTypePhoto_(name) {
+  for (let i = 0; i < RICE_TYPE_PHOTOS.length; i++) if (RICE_TYPE_PHOTOS[i][0].test(String(name || ''))) return RICE_TYPE_PHOTOS[i];
+  return RICE_TYPE_PHOTOS[RICE_TYPE_PHOTOS.length - 1];
+}
+
+/** ดาวน์โหลดภาพประกอบจาก Commons → { blob, credit } (จำไว้ในรอบเดียวกัน ไม่โหลดซ้ำ) */
+function commonsPhoto_(title) {
+  if (COMMONS_MEMO_[title]) return COMMONS_MEMO_[title];
+  const res = UrlFetchApp.fetch(COMMONS_API + '?' + [
+    'action=query', 'format=json', 'prop=imageinfo', 'iiprop=url|extmetadata', 'iiurlwidth=800',
+    'iiextmetadatafilter=LicenseShortName|Artist', 'titles=' + encodeURIComponent(title),
+  ].join('&'), { headers: { 'User-Agent': OFF_UA }, muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) fail_('web_img_down', 'Wikimedia Commons ใช้งานไม่ได้ตอนนี้ (HTTP ' + res.getResponseCode() + ')');
+  const pages = (parseJson_(res.getContentText(), {}).query || {}).pages || {};
+  const page = pages[Object.keys(pages)[0]] || {};
+  const info = (page.imageinfo || [])[0];
+  if (!info) return null;
+  const meta = info.extmetadata || {};
+  const blob = downloadImage_(info.thumburl || info.url);
+  if (!blob) return null;
+  const artist = String((meta.Artist || {}).value || '').replace(/<[^>]+>/g, '').trim();
+  COMMONS_MEMO_[title] = {
+    blob: blob,
+    credit: 'ภาพประกอบจาก Wikimedia Commons: ' + (info.descriptionurl || title) + '\nผู้ถ่าย: ' + (artist || '-') + ' / สัญญาอนุญาต: ' + ((meta.LicenseShortName || {}).value || '-'),
+  };
+  return COMMONS_MEMO_[title];
+}
+
+function saveWebImage_(zortId, blob, desc) {
   const ext = blob.getContentType().split('/')[1].replace('jpeg', 'jpg');
-  const file = webImageFolder_().createFile(blob.setName('z' + z.zortId + '.' + ext));
-  file.setDescription('ค้นด้วย: ' + want.query + '\nพบ: ' + hit.product_name + ' / ' + [].concat(hit.brands || []).join(', ') + ' ' + (hit.quantity || '') +
-    '\nจาก: Open Food Facts https://world.openfoodfacts.org/product/' + (hit.code || '') + ' (CC BY-SA)');
+  const file = webImageFolder_().createFile(blob.copyBlob().setName('z' + zortId + '.' + ext));
+  file.setDescription(desc);
   try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.error(e.message); }
   return 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w600';
+}
+
+/**
+ * ค้นรูปด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive
+ * คืน { url, from: 'product'|'type'|'', note }  (save === false = ดูผลอย่างเดียว ไม่บันทึกไฟล์)
+ */
+function fetchWebImage_(z, save) {
+  const want = offParseName_(z.name);
+  let offErr = '';
+  let hit = null;
+  // ค้นรูปถุงเฉพาะสินค้าที่ระบุยี่ห้อ — ไม่มียี่ห้อ (เช่น ข้าวแบ่งบรรจุของร้าน) ใช้ภาพประกอบ ไม่เอารูปถุงยี่ห้ออื่นมาแสดง
+  if (want.brands.length) {
+    try { hit = offPickBest_(z.name, num_(z.sizeKg), offSearch_(want.query)); } catch (err) { offErr = err.message; }
+  }
+  if (hit) {
+    const note = 'รูปสินค้า: ' + hit.product_name + ' ' + (hit.quantity || '');
+    if (save === false) return { url: hit.image_front_url, from: 'product', note: note };
+    const blob = downloadImage_(hit.image_front_url.replace(/\.\d+\.jpg$/, '.full.jpg')) || downloadImage_(hit.image_front_url);
+    if (blob) {
+      return { from: 'product', note: note, url: saveWebImage_(z.zortId, blob, 'ค้นด้วย: ' + want.query + '\nพบ: ' + hit.product_name + ' / ' +
+        [].concat(hit.brands || []).join(', ') + ' ' + (hit.quantity || '') + '\nจาก: Open Food Facts https://world.openfoodfacts.org/product/' + (hit.code || '') + ' (CC BY-SA)') };
+    }
+  }
+  // ไม่เจอรูปถุงที่ตรง → ภาพประกอบตามชนิดข้าว
+  const t = riceTypePhoto_(z.name);
+  const note = 'ภาพประกอบ' + t[2] + (offErr ? ' (' + offErr + ')' : want.brands.length ? ' (ไม่พบรูปถุงยี่ห้อ ' + want.brands.join(' ') + ')' : ' (ชื่อสินค้าไม่มียี่ห้อ)');
+  if (save === false) return { url: t[1], from: 'type', note: note };
+  const ph = commonsPhoto_(t[1]);
+  if (!ph) return { url: '', from: '', note: 'ดาวน์โหลดภาพประกอบไม่สำเร็จ' };
+  return { from: 'type', note: note, url: saveWebImage_(z.zortId, ph.blob, 'ค้นด้วย: ' + want.query + '\n' + ph.credit) };
 }
 
 function downloadImage_(url) {
@@ -462,47 +526,55 @@ function applyWebImageCache_(objs, imgStat) {
  * (หลังปลดล็อก — ช้า) ค้นรูปใหม่ให้สินค้าที่ยังไม่มีรูป แล้วบันทึกทีละแถว
  * แยกออกจากช่วงล็อก เพื่อไม่ให้ลูกค้าสั่งข้าวไม่ได้ระหว่างค้นรูป
  */
-function searchMissingWebImages_(imgStat, startedAt) {
+function searchMissingWebImages_(imgStat, startedAt, force) {
   if (!webSearchEnabled_()) return;
   const s = getSettings_();
-  const max = Math.max(0, Number(s.WEB_IMAGE_MAX_PER_SYNC === undefined || s.WEB_IMAGE_MAX_PER_SYNC === '' ? 10 : s.WEB_IMAGE_MAX_PER_SYNC) || 0);
+  const setMax = Number(s.WEB_IMAGE_MAX_PER_SYNC === undefined || s.WEB_IMAGE_MAX_PER_SYNC === '' ? 30 : s.WEB_IMAGE_MAX_PER_SYNC) || 0;
+  const max = Math.max(0, force ? Math.max(setMax, 40) : setMax);
   const props = PropertiesService.getScriptProperties();
-  const miss = parseJson_(props.getProperty('WEB_IMG_MISS'), {});
+  const miss = force ? {} : parseJson_(props.getProperty('WEB_IMG_MISS'), {});
   const now = Date.now();
   const todo = readAll_('Products').filter(function (r) {
     const id = String(r.zortId || '').replace(/^'/, '');
     return id && !r.image && !(miss[id] && now - miss[id] < WEB_IMG_RETRY_DAYS * 864e5);
   });
+  const log = [];
   let searched = 0;
+  COMMONS_MEMO_ = {};
   for (let i = 0; i < todo.length && searched < max; i++) {
-    if (Date.now() - startedAt > 240000) break;                               // งบเวลา 4 นาที (Apps Script จำกัด 6 นาที)
+    if (Date.now() - startedAt > 240000) { imgStat.webNote = 'หมดเวลารอบนี้ กดดึงอีกครั้งเพื่อค้นที่เหลือ'; break; }  // Apps Script จำกัด 6 นาที
     const r = todo[i];
     const id = String(r.zortId).replace(/^'/, '');
-    if (searched) Utilities.sleep(1200);                                       // เว้นจังหวะ ไม่ยิงถี่ (บริการฟรี)
+    const name = String(r.name || '') + (num_(r.sizeKg) ? ' ' + num_(r.sizeKg) + ' กก.' : '');
+    if (searched) Utilities.sleep(800);                                        // เว้นจังหวะ ไม่ยิงถี่ (บริการฟรี)
     searched++;
-    let url = '';
-    try { url = fetchWebImage_({ zortId: id, name: String(r.name || ''), sizeKg: r.sizeKg }); } catch (err) {
+    let got;
+    try { got = fetchWebImage_({ zortId: id, name: String(r.name || ''), sizeKg: r.sizeKg }); } catch (err) {
       console.error('ค้นรูปจากเว็บ: ' + err.message);
-      if (/down/.test(err.code || '')) break;                                  // บริการล่ม → หยุดรอบนี้ ไม่นับว่าไม่เจอ
+      log.push({ name: name, ok: false, note: err.message });
+      if (/permission|สิทธิ์|DriveApp|Drive/i.test(err.message)) { imgStat.webError = 'บันทึกรูปลง Google Drive ไม่ได้: ' + err.message; break; }
       continue;
     }
-    if (!url) { miss[id] = now; continue; }
+    log.push({ name: name, ok: !!got.url, from: got.from, note: got.note });
+    if (!got.url) { miss[id] = now; continue; }
     delete miss[id];
     withLock_(function () {
       const row = findRow_('Products', 'zortId', id);
-      if (row && !row.image) updateRow_('Products', row._row, { image: url });
+      if (row && !row.image) updateRow_('Products', row._row, { image: got.url });
     });
     imgStat.none--; imgStat.web++;
   }
   imgStat.searched = searched;
+  imgStat.waiting = Math.max(0, todo.length - searched);
+  imgStat.log = log.slice(0, 40);
   props.setProperty('WEB_IMG_MISS', JSON.stringify(miss));
 }
 
 /** ทดสอบค้นรูป (ไม่บันทึกไฟล์) — แก้ชื่อในฟังก์ชันแล้วกด Run ดูผลใน Execution log */
 function testWebImage() {
-  ['หงษ์ทอง ข้าวหอมมะลิ 5 กก.', 'ข้าวหอมมะลิ 100% 5 กก.', 'ข้าวกล้องหอมมะลิ 1 กก.', 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.'].forEach(function (name) {
-    const url = fetchWebImage_({ zortId: 'test', name: name, sizeKg: 0 }, false);
-    console.log((url ? '✅ ' : '❌ ไม่พบรูปที่ตรงพอ ') + name + (url ? ' → ' + url : ''));
+  ['ข้าวหอมมะลิ 100% 5 กก.', 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.', 'ข้าวเหนียว 5 กก.', 'ข้าวไรซ์เบอร์รี่ 1 กก.', 'ข้าวขาว เสาไห้ 15 กก.'].forEach(function (name) {
+    const got = fetchWebImage_({ zortId: 'test', name: name, sizeKg: 0 }, false);
+    console.log((got.url ? '✅ ' : '❌ ') + name + ' → ' + got.note + (got.url ? '  ' + got.url : ''));
   });
 }
 
@@ -532,8 +604,9 @@ function zortSizeKg_(name, weightGram) {
  *   - แถวที่ไม่ได้มาจาก ZORT (เช่น ข้าวตัวอย่าง p01–p10) ถูกลบออก
  *   - ถ้าดึงจาก ZORT ไม่สำเร็จ หรือได้ 0 รายการ จะไม่แตะชีตเลย (กันรายการข้าวหายหมดเพราะเน็ตหรือตั้งค่าผิด)
  */
-function syncZortProducts() {
+function syncZortProducts(opts) {
   const startedAt = Date.now();
+  const force = !!(opts && opts.forceImages === true);
   const result = withLock_(function () {
     const items = zortFetchRiceProducts_();
     if (!items.length) {
@@ -591,10 +664,14 @@ function syncZortProducts() {
     return result;
   });
   // ค้นรูปจากเว็บหลังปลดล็อก (ลูกค้ายังสั่งข้าวได้ระหว่างนี้)
-  try { searchMissingWebImages_(result.images, startedAt); } catch (err) { console.error('ค้นรูปจากเว็บล้มเหลว: ' + err.message); }
+  try { searchMissingWebImages_(result.images, startedAt, force); } catch (err) {
+    console.error('ค้นรูปจากเว็บล้มเหลว: ' + err.message);
+    result.images.webError = err.message;
+  }
   result.images.webSearch = webSearchEnabled_();
   clearCache();
-  PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(result));
+  const saved = Object.assign({}, result, { images: Object.assign({}, result.images, { log: undefined }) });
+  PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(saved));
   console.log('ZORT sync: ' + JSON.stringify(result));
   return result;
 }

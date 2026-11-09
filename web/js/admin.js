@@ -496,10 +496,25 @@
       A.products = res.products; A.zort = res.zort;
       const r = res.result;
       const im = r.images || {};
-      R.toast('ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')' +
-        (r.images ? ' · รูป: Drive ' + (im.drive || 0) + ', ZORT ' + (im.zort || 0) + ', จากเว็บ ' + (im.web || 0) + ', ไม่มีรูป ' + (im.none || 0) +
-          (im.none && im.webSearch ? ' (หาไม่เจอหรือยังไม่ถึงคิว — วางรูปเองในโฟลเดอร์รูปสินค้าได้)' : '') : ''), 'ok');
+      const head = 'ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')';
+      const imgLine = r.images ? 'รูป: Drive ' + (im.drive || 0) + ' · ZORT ' + (im.zort || 0) + ' · ค้นจากเว็บ ' + (im.web || 0) + ' · ไม่มีรูป ' + (im.none || 0) : '';
       render();
+      if (im.webSearch === false) {
+        R.toast(head + ' · ' + imgLine + ' (ปิดการค้นรูปจากเว็บอยู่ — WEB_IMAGE_SEARCH ในแท็บ Settings)', 'ok');
+      } else if ((im.log && im.log.length) || im.webError) {
+        const rows = (im.log || []).map((x) => '<li style="margin:4px 0">' + (x.ok ? '✅ ' : '❌ ') + '<b>' + esc(x.name) + '</b><br><span class="muted">' + esc(x.note || '') + '</span></li>').join('');
+        R.modal({
+          title: 'ดึงสินค้าเสร็จ — ผลการค้นรูปตามชื่อสินค้า',
+          html: '<p>' + esc(head) + '<br>' + esc(imgLine) + '</p>' +
+            (im.webError ? '<p class="err" style="color:#b42318">⚠️ ' + esc(im.webError) + '</p>' : '') +
+            (rows ? '<ul style="padding-left:4px;list-style:none;max-height:50vh;overflow:auto">' + rows + '</ul>' : '') +
+            (im.waiting ? '<p class="muted">ยังเหลือ ' + im.waiting + ' รายการ กดดึงอีกครั้งเพื่อค้นต่อ</p>' : '') +
+            '<p class="muted">"ภาพประกอบ" = รูปเมล็ดข้าวตามชนิด ใช้เมื่อหารูปถุงยี่ห้อนั้นไม่เจอ — อยากได้รูปจริง วางรูปในโฟลเดอร์รูปสินค้า (ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า) แล้วกดดึงอีกครั้ง</p>',
+          actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }],
+        });
+      } else {
+        R.toast(head + (imgLine ? ' · ' + imgLine : '') + (im.none ? '' : ' · สินค้าทุกตัวมีรูปแล้ว'), 'ok');
+      }
     } catch (e) {
       R.busy(false);
       if (String(e.code || '').indexOf('zort') === 0) {

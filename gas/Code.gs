@@ -481,7 +481,7 @@ function apiAdminZortPushOrder_(req) {
 
 /** ปุ่ม "ดึงสินค้าจาก ZORT" ในหน้าแอดมิน */
 function apiAdminZortSync_() {
-  const result = syncZortProducts();
+  const result = syncZortProducts({ forceImages: true });
   return { result: result, products: getProducts_(false), zort: zortStatus_() };
 }
 
