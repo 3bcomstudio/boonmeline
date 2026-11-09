@@ -403,7 +403,7 @@ function offSearch_(query) {
   const q = query + ' categories_tags:"en:rices"';
   const res = UrlFetchApp.fetch(OFF_SEARCH_URL + '?' + [
     'q=' + encodeURIComponent(q), 'langs=th,en', 'page_size=20',
-    'fields=product_name,brands,image_front_url,quantity,code',
+    'fields=' + encodeURIComponent('product_name,brands,image_front_url,quantity,code'),
   ].join('&'), { headers: { 'User-Agent': OFF_UA, Accept: 'application/json' }, muteHttpExceptions: true });
   const http = res.getResponseCode();
   if (http !== 200) fail_('web_img_down', 'Open Food Facts ใช้งานไม่ได้ตอนนี้ (HTTP ' + http + ')');
@@ -436,8 +436,8 @@ function riceTypePhoto_(name) {
 function commonsPhoto_(title) {
   if (COMMONS_MEMO_[title]) return COMMONS_MEMO_[title];
   const res = UrlFetchApp.fetch(COMMONS_API + '?' + [
-    'action=query', 'format=json', 'prop=imageinfo', 'iiprop=url|extmetadata', 'iiurlwidth=800',
-    'iiextmetadatafilter=LicenseShortName|Artist', 'titles=' + encodeURIComponent(title),
+    'action=query', 'format=json', 'prop=imageinfo', 'iiprop=' + encodeURIComponent('url|extmetadata'), 'iiurlwidth=800',
+    'iiextmetadatafilter=' + encodeURIComponent('LicenseShortName|Artist'), 'titles=' + encodeURIComponent(title),
   ].join('&'), { headers: { 'User-Agent': OFF_UA }, muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) fail_('web_img_down', 'Wikimedia Commons ใช้งานไม่ได้ตอนนี้ (HTTP ' + res.getResponseCode() + ')');
   const pages = (parseJson_(res.getContentText(), {}).query || {}).pages || {};
@@ -493,10 +493,15 @@ function fetchWebImage_(z, save) {
   return { from: 'type', note: note, url: saveWebImage_(z.zortId, ph.blob, 'ค้นด้วย: ' + want.query + '\n' + ph.credit) };
 }
 
+/** UrlFetchApp ไม่รับ URL ที่มีอักขระบางตัว (| " ช่องว่าง ภาษาไทย ฯลฯ) → "อาร์กิวเมนต์ไม่ถูกต้อง" จึงเข้ารหัสก่อน */
+function safeUrl_(url) {
+  return String(url).replace(/[^A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]/g, function (c) { return encodeURIComponent(c); });
+}
+
 function downloadImage_(url) {
   if (!/^https:\/\//i.test(String(url))) return null;
   try {
-    const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (rice-order-bot)' } });
+    const r = UrlFetchApp.fetch(safeUrl_(url), { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (rice-order-bot)' } });
     if (r.getResponseCode() !== 200) return null;
     const blob = r.getBlob();
     const type = String(blob.getContentType() || '').split(';')[0];
