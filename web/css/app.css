@@ -516,8 +516,14 @@ html[data-size="xl"] { font-size: 23px; }
 .pick-first { display: flex; align-items: center; justify-content: center; gap: .35rem; margin: 0; min-height: 3rem; padding: .5rem .8rem; border: 2px dashed var(--line); border-radius: 14px; color: var(--ink-3); font-weight: 700; font-size: .95rem; text-align: center; }
 .pick-first .ic { width: 1.1rem; height: 1.1rem; transform: rotate(-90deg); }
 
-/* เลือกสินค้าก่อน แล้วจึงแสดงปุ่มขนาด/จำนวน */
+/* รายการสินค้า: แตะที่รายการเพื่อเปิดขนาด/หน่วย และปุ่มเลือกแพ็ค */
+.prod.is-closed { grid-template-columns: 5.2rem minmax(0, 1fr) auto; align-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s; }
+.prod.is-closed:hover { background: #FBFAF4; }
+.prod.is-closed:active { background: var(--brand-50); }
+.prod.is-closed:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; }
+.prod-go { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--brand-50); color: var(--brand); }
+.prod-go .ic { width: 1.25rem; height: 1.25rem; transform: rotate(90deg); stroke-width: 2.6; }
 .prod.is-open:not(.is-on) { background: var(--brand-50); border-left-color: var(--brand); }
-.pick-btn { min-height: 3.1rem; font-size: 1.02rem; }
-.pick-btn .ic { width: 1.2rem; height: 1.2rem; stroke-width: 2.6; }
+.prod.just-open .variants, .prod.just-open .prod-qty { animation: open-in .2s ease-out; }
+@keyframes open-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .unpick { grid-column: 1 / -1; justify-self: center; margin-top: .35rem; padding: .35rem .8rem; border: 0; background: none; color: var(--ink-3); font: inherit; font-size: .9rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

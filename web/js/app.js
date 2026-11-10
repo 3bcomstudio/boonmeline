@@ -335,7 +335,7 @@
     }
     return {
       back: '#/', backAct: 'shop-exit', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'กด "เลือกสินค้านี้" แล้วเลือกขนาดและจำนวน') + shopFilters() +
+      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'แตะที่ชื่อข้าว แล้วเลือกขนาดและจำนวน') + shopFilters() +
         '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
     };
@@ -546,11 +546,11 @@
     const sizes = vs.length > 1
       ? 'มี ' + vs.length + ' ขนาด: ' + vs.map((v) => esc(Number(v.sizeKg) ? v.sizeKg + ' กก.' : v.unit)).join(', ')
       : esc(p.unit) + 'ละ ' + p.sizeKg + ' กิโลกรัม';
-    return '<article class="prod is-closed" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '">' +
+    return '<article class="prod is-closed" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '" data-act="pick" data-id="' + esc(p.id) + '" role="button" tabindex="0" aria-expanded="false" aria-label="' + esc(p.name) + ' — แตะเพื่อเลือกขนาดและจำนวน">' +
       '<img class="prod-img" src="' + esc(R.imgUrl(img)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
       '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
       '<div class="prod-size">' + sizes + '</div></div>' +
-      '<div class="prod-qty"><button type="button" class="btn btn-primary btn-block pick-btn" data-act="pick" data-id="' + esc(p.id) + '">' + icon('check') + ' เลือกสินค้านี้</button></div>' +
+      '<span class="prod-go" aria-hidden="true">' + icon('chevron') + '</span>' +
       '</article>';
   }
   /** ปุ่มเปลี่ยนใจ (แสดงเมื่อยังไม่ได้ใส่จำนวน) */
@@ -1137,6 +1137,11 @@
    * Events
    * ========================================================= */
 
+  app.addEventListener('keydown', (e) => {
+    const card = e.target.closest && e.target.closest('.prod.is-closed');
+    if (card && e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); card.click(); }
+  });
+
   app.addEventListener('click', async (e) => {
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
@@ -1170,6 +1175,7 @@
         OPEN.add(gkey(v));
         const card = redrawCard(id);
         const first = card && card.querySelector('.vchip, [data-act="inc"]');
+        if (card) card.classList.add('just-open');
         if (first) first.focus({ preventScroll: true });
         break;
       }
@@ -1178,7 +1184,7 @@
         if (!v) break;
         OPEN.delete(gkey(v)); delete VSEL[gkey(v)];
         const card = redrawCard(id);
-        const b = card && card.querySelector('[data-act="pick"]');
+        const b = card && card.closest('[data-act="pick"]') || card;
         if (b) b.focus({ preventScroll: true });
         break;
       }
