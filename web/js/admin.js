@@ -4,7 +4,7 @@
   const R = window.Rice;
   const { esc, icon, money } = R;
 
-  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', zort: null, filter: 'todo', q: '', pq: '', sel: '', view: 'overview', loadedAt: 0 };
+  const A = { orders: [], products: [], settings: {}, admin: null, sheetUrl: '', zort: null, filter: 'todo', q: '', pq: '', sel: '', view: 'overview', loadedAt: 0, editQuote: {} };
   const root = document.getElementById('admin');
   const SOUND_KEY = 'rice_admin_sound';
   let sound = R.storage(SOUND_KEY) === true;
@@ -368,21 +368,7 @@
 
     const row = (ic, label, val) => '<li><span class="ci-ic">' + icon(ic) + '</span><span class="ci-l">' + label + '</span><span class="ci-v">' + val + '</span></li>';
 
-    return '<div class="d-hero">' +
-      '<button type="button" class="btn btn-ghost btn-sm d-back" data-act="close">' + icon('back') + ' รายการ</button>' +
-      '<div class="dh-main"><span class="dh-k">คำสั่งซื้อ</span>' +
-      '<div class="dh-id"><h2>#' + esc(o.orderId) + '</h2>' + statusPill(o) + '</div>' +
-      '<span class="dh-time">' + icon('clock') + 'สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + ' · ' + R.ago(o.createdAt) + '</span></div>' +
-      '<div class="dh-chips">' +
-      '<span class="dh-chip">' + icon('rice') + '<b>' + esc(unitText) + '</b><small>' + money(o.totalKg) + ' กก.</small></span>' +
-      '<span class="dh-chip">' + icon(isDelivery ? 'truck' : 'store') + '<b>' + (isDelivery ? 'ส่งถึงที่' : 'มารับที่ร้าน') + '</b><small>' + (isDelivery && o.distanceKm != null ? '~' + o.distanceKm + ' กม.' : isDelivery ? 'จัดส่ง' : 'รับเอง') + '</small></span>' +
-      (o.wantDate ? '<span class="dh-chip">' + icon('calendar') + '<b>' + esc(o.wantDate) + '</b><small>ต้องการรับ</small></span>' : '') +
-      (o.total ? '<span class="dh-chip money">' + icon('cash') + '<b>฿' + money(o.total) + '</b><small>ยอดรวม</small></span>' : '') +
-      '</div>' + stepper(o) + '</div>' +
-      (o.zortVoidStatus === 'pending' ? zortLine(o) : '') +
-      '<div class="d-grid">' + actionCard(o) +
-
-      '<section class="card cust-card"><h3>' + icon('user') + 'ลูกค้า</h3>' +
+    const custCard = '<section class="card cust-card"><h3>' + icon('user') + 'ลูกค้า</h3>' +
       '<div class="cust"><span class="avatar">' + (c.linePicture ? '<img src="' + esc(c.linePicture) + '" alt="" referrerpolicy="no-referrer">' : initial) + '</span>' +
       '<div class="cust-b"><strong>' + esc(o.fullName || o.lineName || '-') + '</strong>' +
       '<span class="cust-line">LINE: ' + esc(o.lineName || '-') + '</span>' +
@@ -395,25 +381,62 @@
         : 'มารับเองที่ร้าน') +
       (isDelivery && o.distanceKm != null ? row('map', 'ระยะทาง', '~' + o.distanceKm + ' กม. จากร้าน <span class="muted">(เส้นตรง)</span>') : '') +
       (o.wantDate ? row('calendar', 'ต้องการรับ', esc(o.wantDate)) : '') +
-      (o.payMethod ? row(o.payMethod === 'cod' ? 'cash' : 'qr', 'ชำระเงิน', o.payMethod === 'cod' ? 'เงินสด (ปลายทาง / ที่ร้าน)' : 'โอน / สแกนจ่าย') : '') +
       (o.note ? row('chat', 'หมายเหตุ', '<span class="ci-memo">' + esc(o.note) + '</span>') : '') +
       '</ul><div class="cust-acts">' +
       (o.phone ? '<a class="btn btn-primary btn-sm" href="' + tel + '">' + icon('phone') + ' โทรหาลูกค้า</a>' : '') +
       (map ? '<a class="btn btn-ghost btn-sm" href="' + map + '" target="_blank" rel="noopener">' + icon('map') + ' เปิดแผนที่</a>' : '') +
-      '</div></section>' +
-
-      '<section class="card items-card"><h3>' + icon('receipt') + 'รายการที่สั่ง <span class="h3-n">' + items.length + ' รายการ</span></h3>' +
+      '</div></section>';
+    const itemsCard = '<section class="card items-card"><h3>' + icon('receipt') + 'รายการที่สั่ง <span class="h3-n">' + items.length + ' รายการ</span></h3>' +
       '<ul class="it-list">' + itemsRows + '</ul>' +
-      '<div class="it-sum"><span>รวมทั้งหมด</span><b>' + esc(unitText) + '</b><b class="kg">' + money(o.totalKg) + ' กก.</b></div></section>' +
+      '<div class="it-sum"><span>รวมทั้งหมด</span><b>' + esc(unitText) + '</b><b class="kg">' + money(o.totalKg) + ' กก.</b></div></section>';
 
-      quoteCard(o) +
+    const brief = '<span class="ob-who">' + esc(o.fullName || o.lineName || '-') + '</span>' +
+      (o.phone ? '<a class="ob-tel" href="' + tel + '">' + icon('phone') + esc(R.phoneFmt(o.phone)) + '</a>' : '') +
+      '<span class="ob-items">' + icon('rice') + esc(items.map((i) => i.name + ' × ' + i.qty + ' ' + i.unit).join(', ')) + '</span>';
+    const orderInfo = '<details class="ord-info"' + (o.status === 'new' ? ' open' : '') + '><summary><span class="ob">' + brief + '</span>' +
+      '<span class="ob-more"><span class="t-open">ดูข้อมูลลูกค้าและรายการ</span><span class="t-close">ซ่อน</span>' + icon('chevron') + '</span></summary>' +
+      '<div class="d-grid">' + custCard + itemsCard + '</div></details>';
+    const contact = '<div class="ship-to">' + icon(isDelivery ? 'pin' : 'store') + '<div><b>' + esc(o.fullName || o.lineName || '-') + '</b>' +
+      '<span>' + (isDelivery ? (o.address ? esc(o.address) : 'ยังไม่มีที่อยู่ — โทรสอบถามลูกค้า') : 'มารับเองที่ร้าน') + '</span></div>' +
+      '<div class="ship-acts">' + (o.phone ? '<a class="btn btn-ghost btn-sm" href="' + tel + '">' + icon('phone') + ' โทร</a>' : '') +
+      (map && isDelivery ? '<a class="btn btn-ghost btn-sm" href="' + map + '" target="_blank" rel="noopener">' + icon('map') + ' แผนที่</a>' : '') + '</div></div>';
+    const steps = flowSteps(o, orderInfo, contact);
+    const cur = steps.findIndex((x) => x.state === 'now');
+    const doneN = steps.filter((x) => x.state === 'done').length;
+    const prog = o.status === 'cancelled'
+      ? '<div class="dh-prog cancel">' + icon('x') + '<span><b>ยกเลิกแล้ว</b>' + (o.cancelReason ? ' — ' + esc(o.cancelReason) : '') + '</span></div>'
+      : '<div class="dh-prog"><div class="pg-bar"><i style="width:' + Math.round(doneN / steps.length * 100) + '%"></i></div>' +
+        '<span>' + (cur >= 0 ? 'ขั้นตอนที่ <b>' + (cur + 1) + '</b> จาก ' + steps.length + ' · <b>' + esc(steps[cur].title) + '</b>' : '<b>ครบทุกขั้นตอนแล้ว</b>') + '</span></div>';
 
-      '<section class="card span2"><h3>' + icon('clock') + 'ประวัติคำสั่งซื้อ</h3><ul class="tline">' +
+    return '<div class="d-hero">' +
+      '<button type="button" class="btn btn-ghost btn-sm d-back" data-act="close">' + icon('back') + ' รายการ</button>' +
+      '<div class="dh-main"><span class="dh-k">คำสั่งซื้อ</span>' +
+      '<div class="dh-id"><h2>#' + esc(o.orderId) + '</h2>' + statusPill(o) + '</div>' +
+      '<span class="dh-time">' + icon('clock') + 'สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + ' · ' + R.ago(o.createdAt) + '</span></div>' +
+      '<div class="dh-chips">' +
+      '<span class="dh-chip">' + icon('rice') + '<b>' + esc(unitText) + '</b><small>' + money(o.totalKg) + ' กก.</small></span>' +
+      '<span class="dh-chip">' + icon(isDelivery ? 'truck' : 'store') + '<b>' + (isDelivery ? 'ส่งถึงที่' : 'มารับที่ร้าน') + '</b><small>' + (isDelivery && o.distanceKm != null ? '~' + o.distanceKm + ' กม.' : isDelivery ? 'จัดส่ง' : 'รับเอง') + '</small></span>' +
+      (o.wantDate ? '<span class="dh-chip">' + icon('calendar') + '<b>' + esc(o.wantDate) + '</b><small>ต้องการรับ</small></span>' : '') +
+      (o.total ? '<span class="dh-chip money">' + icon('cash') + '<b>฿' + money(o.total) + '</b><small>ยอดรวม</small></span>' : '') +
+      '</div>' + prog + '</div>' +
+      (o.zortVoidStatus === 'pending' ? zortLine(o) : '') +
+
+      '<ol class="flow">' + steps.map((st, i) =>
+        '<li class="fs ' + st.state + '">' +
+        '<div class="fs-rail"><span class="fs-dot">' + (st.state === 'done' ? icon('check') : st.state === 'cancel' ? icon('x') : (i + 1)) + '</span></div>' +
+        '<div class="fs-main"><div class="fs-h"><div><small>ขั้นตอนที่ ' + (i + 1) + '</small><b>' + esc(st.title) + '</b></div>' +
+        '<span class="fs-badge">' + st.badge + '</span></div>' +
+        (st.body ? '<div class="fs-body">' + st.body + '</div>' : '') + '</div></li>').join('') + '</ol>' +
+
+      (['done', 'cancelled'].indexOf(o.status) < 0
+        ? '<div class="flow-foot"><span>ลูกค้าขอยกเลิก หรือสั่งผิด?</span>' + actBtn(['cancelled', 'ยกเลิกคำสั่งซื้อ', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }], true) + '</div>' : '') +
+
+      '<details class="card hist-card"><summary>' + icon('clock') + '<b>ประวัติการดำเนินการ</b><span class="h3-n">' + (o.history || []).length + ' รายการ · กดเพื่อดู</span></summary><ul class="tline">' +
       (o.history || []).slice().reverse().map((h, i) =>
         '<li class="' + (i === 0 ? 'latest' : '') + '"><span class="tl-dot"></span><div class="tl-b"><b>' + esc((R.ADMIN_STATUS[h.status] || {}).label || h.status) + '</b>' +
         (h.note ? '<p>' + esc(h.note) + '</p>' : '') +
         '<small>' + R.dateTH(h.at, true) + ' · โดย ' + esc(String(h.by || '').replace(/^admin:/, 'แอดมิน ').replace('customer', 'ลูกค้า')) + '</small></div></li>').join('') +
-      '</ul></section></div>';
+      '</ul></details>';
   }
 
   function suggestShip(o) {
@@ -447,7 +470,7 @@
 
   function quoteCard(o) {
     const editable = ['new', 'quoted', 'confirmed'].indexOf(o.status) >= 0;
-    if (!editable) {
+    if (!editable || (o.status !== 'new' && !A.editQuote[o.orderId])) {
       if (!o.quote) return '';
       const q = o.quote;
       return '<section class="card span2 receipt"><h3>' + icon('cash') + 'ราคาที่แจ้งลูกค้า' + (o.quotedAt ? '<span class="h3-n">แจ้งเมื่อ ' + R.dateTH(o.quotedAt, true) + '</span>' : '') + '</h3>' +
@@ -457,7 +480,8 @@
         '<div><span>ค่าส่ง</span><b>' + (q.shippingFee ? '฿' + money(q.shippingFee) : 'ฟรี') + '</b></div>' +
         (q.discount ? '<div class="disc"><span>ส่วนลด</span><b>−฿' + money(q.discount) + '</b></div>' : '') + '</div>' +
         '<div class="sum-total"><span>ยอดที่ลูกค้าต้องชำระ</span><b>฿' + money(q.total) + '</b></div>' +
-        (q.note ? '<p class="rc-note">' + icon('chat') + esc(q.note) + '</p>' : '') + '</section>';
+        (q.note ? '<p class="rc-note">' + icon('chat') + esc(q.note) + '</p>' : '') +
+        (editable ? '<div class="rc-edit"><button type="button" class="btn btn-ghost btn-sm" data-act="edit-quote">' + icon('other') + ' แก้ราคา แล้วส่งใหม่</button></div>' : '') + '</section>';
     }
     const d = getDraft(o);
     const t = draftTotal(d);
@@ -466,7 +490,8 @@
     const resend = o.status !== 'new';
     const stepH = (n, title, hint) => '<div class="qf-h"><span class="qf-n">' + n + '</span><div><b>' + title + '</b>' + (hint ? '<small>' + hint + '</small>' : '') + '</div></div>';
     return '<section class="card span2 qform" id="quote-card">' +
-      '<div class="qf-top"><h3>' + icon('cash') + (resend ? 'แก้ราคา แล้วส่งใหม่' : 'แจ้งราคาให้ลูกค้า') + '</h3>' +
+      '<div class="qf-top"><h3>' + icon('cash') + (resend ? 'แก้ราคา แล้วส่งใหม่' : 'ฟอร์มแจ้งราคา') + '</h3>' +
+      (resend ? '<button type="button" class="link-btn" data-act="edit-quote-cancel">ยกเลิกการแก้</button>' : '') +
       '<span class="qf-tier">' + icon('receipt') + 'ราคาตั้งต้น: ' + (wholesale ? 'ราคาส่ง (' + esc(R.purposeOf(o.purpose).label) + ')' : 'ราคาปลีก') + '</span></div>' +
       '<div class="qf-grid"><div class="qf-steps">' +
 
@@ -501,107 +526,100 @@
       '</div></section>';
   }
 
-  /** หัวข้อสั้น ๆ ว่าต้องทำอะไรต่อ */
-  function nextTitle(o) {
-    const pickup = o.deliveryMethod === 'pickup';
-    switch (o.status) {
-      case 'new': return 'แจ้งราคาให้ลูกค้า';
-      case 'quoted': return 'รอลูกค้ากดยืนยันราคา';
-      case 'confirmed': return o.payMethod === 'cod' ? (pickup ? 'รอลูกค้ามารับข้าว และชำระเงินสด' : 'จัดส่งข้าว และเก็บเงินสดปลายทาง') : 'รอลูกค้าโอนเงิน';
-      case 'slip': return 'ตรวจสลิปการโอนเงิน';
-      case 'paid': return pickup ? 'เตรียมข้าวให้ลูกค้ามารับ' : 'จัดส่งข้าวให้ลูกค้า';
-      case 'shipping': return pickup ? 'รอลูกค้ามารับข้าว' : 'กำลังจัดส่ง — ยืนยันเมื่อลูกค้าได้รับ';
-      case 'done': return 'คำสั่งซื้อเสร็จสมบูรณ์';
-      case 'cancelled': return 'คำสั่งซื้อถูกยกเลิก';
-    }
-    return '';
+  /** ปุ่มเปลี่ยนสถานะ — a = [สถานะใหม่, ข้อความ, แบบปุ่ม, ตัวเลือก] */
+  function actBtn(a, link) {
+    return '<button type="button" class="' + (link ? 'btn btn-ghost btn-sm danger-link' : 'btn btn-' + a[2]) + '" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
+      (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + (a[3] && a[3].zortWarn ? ' data-zortwarn="1"' : '') + '>' + esc(a[1]) + '</button>';
   }
+  const tip = (t) => '<p class="fs-tip">' + icon('bell') + '<span>' + t + '</span></p>';
+  const fact = (t) => '<p class="fs-fact">' + t + '</p>';
+  const acts = (list) => '<div class="fs-acts">' + list.map((a) => actBtn(a)).join('') + '</div>';
 
-  /** แถบความคืบหน้า 6 ขั้น */
-  function stepper(o) {
+  /**
+   * 6 ขั้นตอนของคำสั่งซื้อ เรียงตามลำดับจริง — แต่ละขั้นมีสถานะ done / now / todo / cancel
+   * ปุ่มของแต่ละการกระทำอยู่ในขั้นตอนของมันเอง
+   */
+  function flowSteps(o, orderInfo, contact) {
     const pickup = o.deliveryMethod === 'pickup';
     const cod = o.payMethod === 'cod';
-    const steps = [
-      ['รับคำสั่งซื้อ', o.createdAt],
-      ['แจ้งราคา', o.quotedAt],
-      ['ลูกค้ายืนยัน', o.confirmedAt],
-      [cod ? 'ชำระเงินสด' : 'ชำระเงิน', o.paidAt || o.slipAt],
-      [pickup ? 'ลูกค้ามารับ' : 'จัดส่ง', o.shippedAt],
-      ['สำเร็จ', o.doneAt],
-    ];
-    const cur = { new: 1, quoted: 2, confirmed: cod ? 4 : 3, slip: 3, paid: 4, shipping: 4, done: 6 }[o.status];
-    if (o.status === 'cancelled') {
-      return '<div class="stepper cancelled">' + icon('x') + '<span><b>ยกเลิกแล้ว</b>' + (o.cancelReason ? ' — ' + esc(o.cancelReason) : '') + '</span></div>';
-    }
-    return '<ol class="stepper">' + steps.map((st, i) => {
-      const state = i < cur ? 'done' : i === cur ? 'now' : 'todo';
-      const skipped = state === 'done' && !st[1] && i > 0;
-      return '<li class="st ' + state + '"><span class="st-dot">' + (state === 'done' ? icon('check') : i + 1) + '</span>' +
-        '<span class="st-t">' + st[0] + '</span>' +
-        '<span class="st-d">' + (state === 'done' && st[1] ? R.dateTH(st[1], true) : state === 'now' ? 'ขั้นตอนนี้' : skipped ? '—' : '') + '</span></li>';
-    }).join('') + '</ol>';
-  }
+    const st = o.status;
+    const cancelled = st === 'cancelled';
+    const idx = { new: 1, quoted: 2, confirmed: cod ? 4 : 3, slip: 3, paid: 4, shipping: 4, done: 6 }[st];
+    const reached = (i, at) => cancelled ? (at ? 'done' : 'cancel') : i < idx ? 'done' : i === idx ? 'now' : 'todo';
+    const badge = (state, at) => state === 'done' ? icon('check') + (at ? R.dateTH(at, true) : 'เสร็จแล้ว')
+      : state === 'now' ? 'ทำขั้นตอนนี้' : state === 'cancel' ? 'ยกเลิก' : 'ยังไม่ถึง';
+    const S = [];
 
-  function actionCard(o) {
-    const acts = [];
-    let note = '';
-    const pickup = o.deliveryMethod === 'pickup';
-    const shipLabel = pickup ? 'ข้าวพร้อมให้มารับ' : 'เริ่มจัดส่ง';
-    switch (o.status) {
-      case 'new':
-        note = 'ตรวจจำนวนและราคาในฟอร์ม "แจ้งราคาให้ลูกค้า" ด้านล่าง แล้วกดส่ง ลูกค้าจะได้ข้อความใน LINE พร้อมปุ่มยืนยัน';
-        acts.push(['#quote', 'ไปที่ฟอร์มแจ้งราคา', 'primary']);
-        break;
-      case 'quoted':
-        note = 'ส่งราคาแล้ว ' + R.ago(o.quotedAt) + ' รอลูกค้ากดยืนยัน ถ้าลูกค้ายืนยันทางโทรศัพท์ กดปุ่มด้านล่างแทนได้';
-        acts.push(['confirmed', 'ลูกค้ายืนยันทางโทรศัพท์', 'ghost', { pay: true }]);
-        break;
-      case 'confirmed':
-        if (o.payMethod === 'cod') {
-          note = 'ลูกค้าเลือกจ่ายเงินสด ฿' + money(o.total) + ' ตอนรับข้าว — เมื่อลูกค้ารับข้าวและจ่ายเงินครบแล้ว กดปุ่มด้านล่าง';
-          acts.push(['done', 'ลูกค้ามารับสินค้า ชำระเงินเรียบร้อย', 'go']);
-        } else {
-          note = 'ลูกค้ายืนยันแล้ว รอโอนเงิน ฿' + money(o.total) + ' และส่งสลิป';
-          acts.push(['paid', 'ได้รับเงินแล้ว (ตรวจในแอปธนาคาร)', 'go']);
-        }
-        break;
-      case 'slip':
-        note = 'ตรวจยอด ฿' + money(o.total) + ' ในแอปธนาคารให้ตรงกับสลิป';
-        acts.push(['paid', 'สลิปถูกต้อง ได้รับเงินแล้ว', 'go']);
-        acts.push(['confirmed', 'สลิปไม่ถูกต้อง ขอให้ส่งใหม่', 'danger', { needNote: true }]);
-        break;
-      case 'paid':
-        acts.push(['shipping', shipLabel, 'primary']);
-        acts.push(['done', pickup ? 'ลูกค้ามารับแล้ว' : 'ส่งสำเร็จ', 'ghost']);
-        break;
-      case 'shipping':
-        acts.push(['done', pickup ? 'ลูกค้ามารับแล้ว' : 'ส่งสำเร็จ ลูกค้าได้รับแล้ว', 'go']);
-        break;
-      case 'done':
-        note = 'คำสั่งซื้อเสร็จสมบูรณ์ ' + R.dateTH(o.doneAt, true);
-        acts.push(['cancelled', 'ยกเลิกการขายนี้ (คืนเงิน / คืนสินค้า)', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }]);
-        break;
-      case 'cancelled':
-        note = 'ยกเลิกแล้ว: ' + (o.cancelReason || '-');
-        break;
-    }
-    if (['done', 'cancelled'].indexOf(o.status) < 0) acts.push(['cancelled', 'ยกเลิกคำสั่งซื้อ', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }]);
-    const slip = o.slipUrl
-      ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>'
-      : '';
-    const main = acts.filter((a) => a[2] !== 'danger');
-    const danger = acts.filter((a) => a[2] === 'danger');
-    const btn = (a) => a[0] === '#quote'
-      ? '<button type="button" class="btn btn-' + a[2] + '" data-act="to-quote">' + icon('chevron') + esc(a[1]) + '</button>'
-      : '<button type="button" class="btn btn-' + a[2] + '" data-act="status" data-to="' + a[0] + '" data-label="' + esc(a[1]) + '"' +
-        (a[3] && a[3].needNote ? ' data-neednote="1"' : '') + (a[3] && a[3].pay ? ' data-pay="1"' : '') + (a[3] && a[3].zortWarn ? ' data-zortwarn="1"' : '') + '>' + esc(a[1]) + '</button>';
-    const tone = o.status === 'cancelled' ? 'is-cancel' : o.status === 'done' ? 'is-done' : 'is-todo';
-    return '<section class="card span2 nextcard ' + tone + '"><div class="nx-h"><span class="nx-ic">' + icon(o.status === 'done' ? 'check' : o.status === 'cancelled' ? 'x' : 'bell') + '</span>' +
-      '<div><small>' + (o.status === 'done' || o.status === 'cancelled' ? 'สถานะ' : 'สิ่งที่ต้องทำตอนนี้') + '</small><b>' + esc(nextTitle(o)) + '</b></div></div>' +
-      (note ? '<p class="act-note">' + esc(note) + '</p>' : '') + slip + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
-      (main.length ? '<div class="nx-acts">' + main.map(btn).join('') + '</div>' : '') +
-      (danger.length ? '<div class="nx-danger">' + danger.map((a) => btn(a).replace('btn btn-danger', 'btn btn-ghost btn-sm danger-link')).join('') + '</div>' : '') +
-      '</section>';
+    // 1) รับคำสั่งซื้อ
+    S.push({ title: 'รับคำสั่งซื้อจากลูกค้า', state: 'done', at: o.createdAt, body: orderInfo });
+
+    // 2) แจ้งราคา
+    let s2 = reached(1, o.quotedAt), b2 = '';
+    if (s2 === 'now') b2 = tip('ตรวจจำนวน ราคา ค่าส่ง แล้วกด <b>ส่งราคาให้ลูกค้าทาง LINE</b> — ลูกค้าจะได้ข้อความพร้อมปุ่มยืนยัน') + quoteCard(o);
+    else if (s2 === 'done' || o.quote) b2 = quoteCard(o);
+    else b2 = fact('ยังไม่ได้แจ้งราคา');
+    S.push({ title: 'แจ้งราคาให้ลูกค้า', state: s2, at: o.quotedAt, body: b2 });
+
+    // 3) ลูกค้ายืนยันราคา
+    const s3 = reached(2, o.confirmedAt);
+    let b3 = '';
+    if (s3 === 'now') {
+      b3 = tip('ส่งราคาแล้ว ' + R.ago(o.quotedAt) + ' — รอลูกค้ากดยืนยันใน LINE ถ้าลูกค้าตกลงทางโทรศัพท์ กดปุ่มด้านล่างแทนได้') +
+        acts([['confirmed', 'ลูกค้ายืนยันทางโทรศัพท์', 'ghost', { pay: true }]]);
+    } else if (s3 === 'done') {
+      b3 = fact('ลูกค้ายืนยันราคา' + (o.payMethod ? ' · เลือก<b>' + (cod ? 'ชำระเงินสดตอนรับสินค้า' : 'โอน / สแกนจ่าย') + '</b>' : ''));
+    } else b3 = fact('ลูกค้ากดยืนยันหลังได้รับราคาทาง LINE');
+    S.push({ title: 'ลูกค้ายืนยันราคา', state: s3, at: o.confirmedAt, body: b3 });
+
+    // 4) ชำระเงิน
+    const s4 = cod && !cancelled ? (st === 'done' ? 'done' : idx > 3 ? 'skip' : reached(3)) : reached(3, o.paidAt);
+    let b4 = '';
+    if (cod && st !== 'done') {
+      b4 = fact('ลูกค้าเลือก<b>ชำระเงินสด ฿' + money(o.total) + '</b> ตอนรับสินค้า — ยืนยันการรับเงินในขั้นตอนถัดไป');
+    } else if (s4 === 'now') {
+      const slip = o.slipUrl ? '<a class="slip-link" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' เปิดดูรูปสลิป' + (o.slipAt ? ' (ส่งเมื่อ ' + R.ago(o.slipAt) + ')' : '') + '</a>' : '';
+      b4 = st === 'slip'
+        ? tip('ลูกค้าส่งสลิปแล้ว — เปิดแอปธนาคาร ตรวจว่าได้รับเงิน <b>฿' + money(o.total) + '</b> จริง แล้วกดยืนยัน') + slip +
+          acts([['paid', 'สลิปถูกต้อง ได้รับเงินแล้ว', 'go'], ['confirmed', 'สลิปไม่ถูกต้อง ขอให้ส่งใหม่', 'ghost', { needNote: true }]])
+        : tip('รอลูกค้าโอนเงิน <b>฿' + money(o.total) + '</b> และส่งสลิป ถ้าเห็นเงินเข้าแล้ว กดยืนยันได้เลย') +
+          acts([['paid', 'ได้รับเงินแล้ว (ตรวจในแอปธนาคาร)', 'go']]);
+    } else if (s4 === 'done') {
+      b4 = fact('ได้รับเงิน <b>฿' + money(o.total) + '</b>' + (cod ? ' (เงินสด)' : ' (โอน)')) +
+        (o.slipUrl ? '<a class="slip-link sm" href="' + esc(o.slipUrl) + '" target="_blank" rel="noopener">' + icon('camera') + ' ดูสลิป</a>' : '');
+    } else b4 = fact('ลูกค้าโอนเงินหรือชำระเงินสด หลังยืนยันราคา');
+    S.push({ title: cod ? 'ชำระเงินสด (ตอนรับสินค้า)' : 'ชำระเงิน', state: s4 === 'skip' ? 'todo' : s4, at: cod ? o.doneAt : o.paidAt, body: b4 });
+
+    // 5) จัดส่ง / ลูกค้ามารับ
+    const s5 = reached(4, o.shippedAt || (st === 'done' ? o.doneAt : ''));
+    let b5 = '';
+    if (s5 === 'now') {
+      if (st === 'confirmed' && cod) {
+        b5 = tip(pickup ? 'เตรียมข้าวไว้ให้ลูกค้ามารับ เมื่อลูกค้ารับข้าวและจ่ายเงินสด <b>฿' + money(o.total) + '</b> ครบแล้ว กดปุ่มด้านล่าง'
+          : 'นำข้าวไปส่ง และเก็บเงินสด <b>฿' + money(o.total) + '</b> เมื่อส่งและได้เงินครบแล้ว กดปุ่มด้านล่าง') +
+          acts([['done', pickup ? 'ลูกค้ามารับสินค้า ชำระเงินเรียบร้อย' : 'ส่งสำเร็จ ได้รับเงินสดแล้ว', 'go']]);
+      } else if (st === 'paid') {
+        b5 = tip(pickup ? 'เตรียมข้าวให้พร้อม แล้วแจ้งลูกค้าว่ามารับได้' : 'จัดข้าวขึ้นรถ แล้วกด "เริ่มจัดส่ง" ลูกค้าจะได้รับแจ้งทาง LINE') +
+          acts([['shipping', pickup ? 'ข้าวพร้อมให้มารับแล้ว' : 'เริ่มจัดส่ง', 'primary'], ['done', pickup ? 'ลูกค้ามารับแล้ว' : 'ส่งสำเร็จแล้ว', 'ghost']]);
+      } else if (st === 'shipping') {
+        b5 = tip(pickup ? 'รอลูกค้ามารับข้าว' : 'กำลังจัดส่ง — เมื่อลูกค้าได้รับข้าวแล้ว กดปุ่มด้านล่าง') +
+          acts([['done', pickup ? 'ลูกค้ามารับแล้ว' : 'ส่งสำเร็จ ลูกค้าได้รับแล้ว', 'go']]);
+      }
+      b5 += contact;
+    } else if (s5 === 'done') b5 = fact(pickup ? 'ลูกค้ามารับสินค้าแล้ว' : 'ส่งถึงลูกค้าแล้ว');
+    else b5 = fact(pickup ? 'ลูกค้ามารับที่ร้าน' : 'ส่งถึงที่อยู่ลูกค้า' + (o.distanceKm != null ? ' (~' + o.distanceKm + ' กม.)' : ''));
+    S.push({ title: pickup ? 'ลูกค้ามารับสินค้า' : 'จัดส่งสินค้า', state: s5, at: o.shippedAt || (st === 'done' ? o.doneAt : ''), body: b5 });
+
+    // 6) ปิดการขาย
+    const s6 = cancelled ? 'cancel' : st === 'done' ? 'done' : 'todo';
+    const b6 = st === 'done'
+      ? fact('ปิดการขายเรียบร้อย') + (o.zortVoidStatus === 'pending' ? '' : zortLine(o)) +
+        '<div class="fs-danger">' + actBtn(['cancelled', 'ยกเลิกการขายนี้ (คืนเงิน / คืนสินค้า)', 'danger', { needNote: true, zortWarn: !!o.zortOrderId }], true) + '</div>'
+      : cancelled ? fact('ยกเลิกแล้ว' + (o.cancelReason ? ': ' + esc(o.cancelReason) : '')) + (o.zortVoidStatus === 'pending' ? '' : zortLine(o))
+      : fact('ระบบบันทึกยอดขายเข้า ZORT ให้อัตโนมัติเมื่อปิดการขาย');
+    S.push({ title: 'ปิดการขาย', state: s6, at: o.doneAt, body: b6 });
+
+    S.forEach((x) => { x.badge = badge(x.state, x.at); });
+    return S;
   }
 
   /** สถานะการบันทึกยอดขายใน ZORT (แสดงเมื่อปิดการขายแล้ว) */
@@ -690,6 +708,7 @@
     try {
       const res = await R.api('adminQuote', { orderId: o.orderId, lines: d.lines, shippingFee: d.shippingFee, discount: d.discount, note: d.note });
       replaceOrder(res.order);
+      delete A.editQuote[o.orderId]; delete drafts[o.orderId];
       renderListOnly(); renderDetail();
       pushToast(res, 'บันทึกราคาแล้ว');
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
@@ -877,6 +896,8 @@
       case 'zort-push': zortPushOrder(); break;
       case 'zort-void-done': zortVoidDone(); break;
       case 'send-quote': sendQuote(); break;
+      case 'edit-quote': A.editQuote[A.sel] = true; renderDetail(); { const qc = document.getElementById('quote-card'); if (qc) qc.scrollIntoView({ behavior: 'smooth', block: 'start' }); } break;
+      case 'edit-quote-cancel': delete A.editQuote[A.sel]; delete drafts[A.sel]; renderDetail(); break;
       case 'to-quote': {
         const qc = document.getElementById('quote-card');
         if (qc) { qc.scrollIntoView({ behavior: 'smooth', block: 'start' }); const f = qc.querySelector('input'); if (f) setTimeout(() => f.focus({ preventScroll: true }), 400); }
