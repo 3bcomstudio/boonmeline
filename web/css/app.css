@@ -511,3 +511,7 @@ html[data-size="xl"] { font-size: 23px; }
 .menu-item .mi-text { display: block; }
 .tile .t-text { display: block; }
 .tile .t-text strong { display: block; }
+
+/* ยังไม่ได้เลือกขนาด: บอกให้เลือกก่อน (ไม่เลือกขนาดให้ล่วงหน้า) */
+.pick-first { display: flex; align-items: center; justify-content: center; gap: .35rem; margin: 0; min-height: 3rem; padding: .5rem .8rem; border: 2px dashed var(--line); border-radius: 14px; color: var(--ink-3); font-weight: 700; font-size: .95rem; text-align: center; }
+.pick-first .ic { width: 1.1rem; height: 1.1rem; transform: rotate(-90deg); }
