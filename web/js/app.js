@@ -335,7 +335,7 @@
     }
     return {
       back: '#/', backAct: 'shop-exit', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'เลือกขนาด แล้วกดปุ่ม + เพื่อใส่จำนวน') + shopFilters() +
+      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'กด "เลือกสินค้านี้" แล้วเลือกขนาดและจำนวน') + shopFilters() +
         '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
     };
@@ -536,12 +536,33 @@
   const gkey = (p) => String(p.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const variantLabel = (p) => (Number(p.sizeKg) ? p.sizeKg + ' กก.' : '') + (p.unit ? (Number(p.sizeKg) ? ' / ' : '') + p.unit : '');
   const VSEL = {}; // ขนาดที่เลือกไว้ของแต่ละชื่อ
+  const OPEN = new Set(); // สินค้าที่ลูกค้ากด "เลือกสินค้านี้" แล้ว (จึงแสดงปุ่มขนาด/จำนวน)
+  const isOpen = (vs) => OPEN.has(gkey(vs[0])) || vs.some((v) => cart.items[v.id] > 0);
+
+  /** การ์ดที่ยังไม่ได้เลือก: เห็นรูป ชื่อ ขนาดที่มี และปุ่ม "เลือกสินค้านี้" เท่านั้น */
+  function prodClosed(vs) {
+    const p = vs[0];
+    const img = (vs.find((v) => v.image) || p).image;
+    const sizes = vs.length > 1
+      ? 'มี ' + vs.length + ' ขนาด: ' + vs.map((v) => esc(Number(v.sizeKg) ? v.sizeKg + ' กก.' : v.unit)).join(', ')
+      : esc(p.unit) + 'ละ ' + p.sizeKg + ' กิโลกรัม';
+    return '<article class="prod is-closed" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '">' +
+      '<img class="prod-img" src="' + esc(R.imgUrl(img)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
+      '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
+      '<div class="prod-size">' + sizes + '</div></div>' +
+      '<div class="prod-qty"><button type="button" class="btn btn-primary btn-block pick-btn" data-act="pick" data-id="' + esc(p.id) + '">' + icon('check') + ' เลือกสินค้านี้</button></div>' +
+      '</article>';
+  }
+  /** ปุ่มเปลี่ยนใจ (แสดงเมื่อยังไม่ได้ใส่จำนวน) */
+  const unpickBtn = (vs) => vs.some((v) => cart.items[v.id] > 0) ? ''
+    : '<button type="button" class="unpick" data-act="unpick" data-id="' + esc(vs[0].id) + '">ไม่เลือกสินค้านี้</button>';
 
   /** ล้างค่าหน้าเลือกข้าว (ขั้นที่ 1): รายการ/จำนวน ขนาดที่เลือก คำค้น และตัวกรอง — ใช้ตอนกลับหน้าแรกหรือสั่งเสร็จ */
   function resetShop() {
     cart = newCart(); saveCart();
     Object.keys(VSEL).forEach((k) => { delete VSEL[k]; });
     F.q = ''; F.cat = ''; F.unit = ''; F.size = '';
+    OPEN.clear();
   }
 
   /** จัดกลุ่มตามชื่อ (เรียงตามลำดับสินค้าเดิม) ภายในกลุ่มเรียงน้ำหนักน้อย → มาก */
@@ -559,6 +580,7 @@
 
   /** การ์ดของกลุ่ม — ถ้ามีขนาดเดียวจะหน้าตาเหมือนการ์ดสินค้าปกติ */
   function prodCard(vs) {
+    if (!isOpen(vs)) return prodClosed(vs);
     if (vs.length === 1) return prodRow(vs[0], vs);
     const sel = selectedVariant(vs);
     const p = sel || vs[0];
@@ -571,12 +593,12 @@
         (Number(v.sizeKg) ? '<span class="vchip-unit">' + esc(v.unit) + '</span>' : '') +
         (q ? '<b class="vchip-n" aria-label="เลือกแล้ว ' + q + ' ' + esc(v.unit) + '">' + q + '</b>' : '') + '</button>';
     }).join('');
-    return '<article class="prod' + (inCart.length ? ' is-on' : '') + '" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '">' +
+    return '<article class="prod is-open' + (inCart.length ? ' is-on' : '') + '" data-ids="' + esc(vs.map((v) => v.id).join(' ')) + '">' +
       '<img class="prod-img" src="' + esc(R.imgUrl(img)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
       '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
       '<div class="prod-size">มี ' + vs.length + ' ขนาด</div></div>' +
       '<div class="variants"><div class="variants-label">เลือกขนาด / หน่วย</div><div class="vchips" role="group" aria-label="ขนาดของ' + esc(p.name) + '">' + chips + '</div></div>' +
-      (sel ? qtyControl(sel) : '<div class="prod-qty"><p class="pick-first">' + icon('chevron') + 'เลือกขนาด / หน่วยด้านบนก่อน</p></div>') + '</article>';
+      (sel ? qtyControl(sel) : '<div class="prod-qty"><p class="pick-first">' + icon('chevron') + 'เลือกขนาด / หน่วยด้านบนก่อน</p></div>') + unpickBtn(vs) + '</article>';
   }
 
   function qtyControl(p) {
@@ -610,11 +632,11 @@
 
   function prodRow(p) {
     const qty = cart.items[p.id] || 0;
-    return '<article class="prod' + (qty ? ' is-on' : '') + '" data-ids="' + esc(p.id) + '">' +
+    return '<article class="prod is-open' + (qty ? ' is-on' : '') + '" data-ids="' + esc(p.id) + '">' +
       '<img class="prod-img" src="' + esc(R.imgUrl(p.image)) + '" alt="" width="104" height="104" loading="lazy" onerror="this.src=\'assets/rice-placeholder.svg\'">' +
       '<div><div class="prod-name">' + esc(p.name) + '</div>' + (p.detail ? '<div class="prod-detail">' + esc(p.detail) + '</div>' : '') +
       '<div class="prod-size">' + esc(p.unit) + 'ละ ' + p.sizeKg + ' กิโลกรัม</div></div>' +
-      qtyControl(p) + '</article>';
+      qtyControl(p) + unpickBtn([p]) + '</article>';
   }
 
   function shopBar() {
@@ -1140,6 +1162,24 @@
         const q = document.getElementById('shop-q');
         if (q) q.value = '';
         refreshShop();
+        break;
+      }
+      case 'pick': {
+        const v = productById(id);
+        if (!v) break;
+        OPEN.add(gkey(v));
+        const card = redrawCard(id);
+        const first = card && card.querySelector('.vchip, [data-act="inc"]');
+        if (first) first.focus({ preventScroll: true });
+        break;
+      }
+      case 'unpick': {
+        const v = productById(id);
+        if (!v) break;
+        OPEN.delete(gkey(v)); delete VSEL[gkey(v)];
+        const card = redrawCard(id);
+        const b = card && card.querySelector('[data-act="pick"]');
+        if (b) b.focus({ preventScroll: true });
         break;
       }
       case 'inc': setQty(id, (cart.items[id] || 0) + 1); break;
