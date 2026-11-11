@@ -7,7 +7,7 @@
   const KEY = 'rice_demo_db_v3';
   const ME = { userId: 'Udemo-me', name: 'สมศรี ใจดี', picture: '' };
 
-  const PURPOSE_LABEL = { home: 'กินเองที่บ้าน', donate: 'ทำบุญ / บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง / ขายต่อ', other: 'อื่น ๆ' };
+  const PURPOSE_LABEL = { home: 'กินเอง', donate: 'ทำบุญ/บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง/ขายต่อ', other: 'อื่น ๆ' };
   const TRANS = {
     new: ['cancelled'], quoted: ['confirmed', 'cancelled'], confirmed: ['paid', 'shipping', 'done', 'cancelled'],
     slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'], done: ['cancelled'],
@@ -48,7 +48,7 @@
         userId: cust.userId, lineName: cust.lineName, fullName: cust.fullName, phone: cust.phone,
         purpose, purposeLabel: PURPOSE_LABEL[purpose], purposeNote: note,
         deliveryMethod: method, address: method === 'delivery' ? cust.address : '', lat: cust.lat, lng: cust.lng,
-        distanceKm: method === 'delivery' ? cust.km : null, wantDate: 'เร็วที่สุด', note: '',
+        distanceKm: method === 'delivery' ? cust.km : null, wantDate: 'ตอนนี้', note: '',
         items: its, itemsText: its.map((i) => i.name + ' ' + i.sizeKg + ' กก. × ' + i.qty + ' ' + i.unit).join('\n'),
         totalBags: its.reduce((s, i) => s + i.qty, 0), totalKg: its.reduce((s, i) => s + i.qty * i.sizeKg, 0),
         quote: null, total: 0, payMethod: '', slipUrl: '', cancelReason: '',

@@ -17,10 +17,10 @@
 const APP_VERSION = '1.0.0';
 
 const PURPOSES = {
-  home: 'กินเองที่บ้าน',
-  donate: 'ทำบุญ / บริจาค',
+  home: 'กินเอง',
+  donate: 'ทำบุญ/บริจาค',
   restaurant: 'ร้านอาหาร',
-  wholesale: 'ขายส่ง / ขายต่อ',
+  wholesale: 'ขายส่ง/ขายต่อ',
   other: 'อื่น ๆ',
 };
 /** วัตถุประสงค์ที่ระบบเสนอราคาส่งให้แอดมินเป็นค่าเริ่มต้น */
@@ -291,7 +291,7 @@ function apiCreateOrder_(user, o) {
 
   const settingsNow = getSettings_();
   const wantDate = clean_(o.wantDate, 40);
-  if (/^เร็วที่สุด/.test(wantDate) && shopOpenNow_(settingsNow) === false) {
+  if (/^(เร็วที่สุด|ตอนนี้)/.test(wantDate) && shopOpenNow_(settingsNow) === false) {
     fail_('shop_closed', 'ตอนนี้ร้านปิดอยู่ กรุณาเลือกรับข้าวพรุ่งนี้ หรือเลือกวันอื่น');
   }
 

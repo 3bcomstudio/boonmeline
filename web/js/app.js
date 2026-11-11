@@ -55,7 +55,7 @@
       return n.label + ' (' + R.dateTH(n.date.toISOString()) + ')';
     }
     if (cart.wantMode === 'date' && cart.wantDate) return R.dateTH(cart.wantDate + 'T12:00:00');
-    return 'เร็วที่สุด';
+    return 'ตอนนี้';
   }
 
   /* =========================================================
@@ -292,7 +292,7 @@
     const t = new Date(); t.setDate(t.getDate() + 1);
     return { date: t, label: 'พรุ่งนี้' };
   }
-  /** นอกเวลาทำการเลือก "เร็วที่สุด" ไม่ได้ → เปลี่ยนเป็นวันเปิดถัดไปให้เอง */
+  /** นอกเวลาทำการเลือก "ตอนนี้" ไม่ได้ → เปลี่ยนเป็นวันเปิดถัดไปให้เอง */
   function normalizeWant() {
     if (cart.wantMode === 'asap' && closedNow()) { cart.wantMode = 'tomorrow'; saveCart(); }
   }
@@ -329,13 +329,13 @@
     if (!S.products.length) {
       return {
         back: '#/', backAct: 'shop-exit', top: 'สั่งซื้อข้าวสาร',
-        body: stepHead(1, 'เลือกข้าวที่ต้องการ', '') + '<div class="prod-list"><div class="empty">' + icon('rice') + '<p>ตอนนี้ยังไม่มีข้าวให้เลือก กรุณาโทรหาร้าน</p></div></div>',
+        body: stepHead(1, 'กรุณาเลือกยี่ห้อข้าวสารที่ต้องการ', '') + '<div class="prod-list"><div class="empty">' + icon('rice') + '<p>ตอนนี้ยังไม่มีข้าวให้เลือก กรุณาโทรหาร้าน</p></div></div>',
         bar: shopBar(),
       };
     }
     return {
       back: '#/', backAct: 'shop-exit', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(1, 'เลือกข้าวที่ต้องการ', 'แตะที่ชื่อข้าว แล้วเลือกขนาดและจำนวน') + shopFilters() +
+      body: stepHead(1, 'กรุณาเลือกยี่ห้อข้าวสารที่ต้องการ', 'แตะที่ชื่อข้าว แล้วเลือกขนาดและจำนวน') + shopFilters() +
         '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
     };
@@ -643,7 +643,7 @@
     const s = cartSummary();
     return s.count
       ? '<div class="actionbar-sum"><span>เลือกแล้ว</span><b>' + esc(s.text) + ' (' + s.kg + ' กก.)</b></div>' +
-        '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="go" data-to="#/purpose">ไปขั้นต่อไป ' + icon('chevron') + '</button>'
+        '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="go" data-to="#/purpose">ถัดไป ' + icon('chevron') + '</button>'
       : '<button type="button" class="btn btn-primary btn-lg btn-block" disabled>เลือกข้าวอย่างน้อย 1 อย่าง</button>';
   }
 
@@ -686,7 +686,7 @@
       back: '#/shop', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'ร้านจะคิดราคาให้เหมาะกับการใช้งานของคุณ') +
         '<div class="tiles">' + tiles + '</div><div id="purpose-note">' + purposeNoteField() + '</div>',
-      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ไปขั้นต่อไป ' + icon('chevron') + '</button>',
+      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ถัดไป ' + icon('chevron') + '</button>',
     };
   };
 
@@ -710,7 +710,7 @@
     const shopMap = R.mapUrl(st.SHOP_LAT, st.SHOP_LNG);
     let detail;
     if (cart.deliveryMethod === 'delivery') {
-      detail = '<section class="section"><h2 class="section-title">ส่งข้าวไปที่ไหน</h2><div class="panel">' +
+      detail = '<section class="section"><h2 class="section-title">ระบุที่อยู่ในการจัดส่ง</h2><div class="panel">' +
         '<label class="field"><span class="field-label">ที่อยู่</span>' +
         '<textarea class="textarea" data-bind="address" rows="3" maxlength="500" placeholder="บ้านเลขที่ หมู่ ซอย ถนน ตำบล">' + esc(cart.address) + '</textarea>' +
         '<span class="field-hint">ถ้าส่งไปวัดหรือที่อื่น แก้ที่อยู่ตรงนี้ได้เลย</span></label>' +
@@ -733,23 +733,23 @@
     const badDate = cart.wantMode === 'date' && cart.wantDate && !openOn(new Date(cart.wantDate + 'T12:00:00'));
     return {
       back: '#/purpose', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(3, 'รับข้าวอย่างไร', '') +
+      body: stepHead(3, 'กรุณาเลือกประเภทการจัดส่ง', '') +
         '<div class="tiles one">' +
-        tile({ act: 'method', id: 'delivery', icon: 'truck', label: 'ส่งถึงที่', sub: 'ร้านนำข้าวไปส่งให้', on: cart.deliveryMethod === 'delivery' }) +
-        tile({ act: 'method', id: 'pickup', icon: 'store', label: 'มารับเองที่ร้าน', sub: 'ไม่มีค่าส่ง', on: cart.deliveryMethod === 'pickup' }) +
+        tile({ act: 'method', id: 'delivery', icon: 'truck', label: 'ส่งตามที่อยู่ผู้รับ', on: cart.deliveryMethod === 'delivery' }) +
+        tile({ act: 'method', id: 'pickup', icon: 'store', label: 'มารับเอง', on: cart.deliveryMethod === 'pickup' }) +
         '</div>' + detail +
-        '<section class="section"><h2 class="section-title">อยากได้ข้าววันไหน</h2>' +
+        '<section class="section"><h2 class="section-title">ต้องการใช้สินค้าเมื่อไหร่</h2>' +
         (closed ? '<p class="want-note">' + icon('clock') + '<span><b>ตอนนี้ร้านปิดอยู่</b>' + (status ? ' (' + esc(status.sub.split(' · ')[0]) + ')' : '') +
           ' เลือกรับข้าวได้ตั้งแต่' + (nxt.label === 'พรุ่งนี้' ? 'พรุ่งนี้' : nxt.label) + 'เป็นต้นไป</span></p>' : '') +
         '<div class="chips">' +
-        chip('asap', closed ? 'เร็วที่สุด (ร้านปิดอยู่)' : 'เร็วที่สุด', closed) +
+        chip('asap', 'ตอนนี้', closed) +
         chip('tomorrow', nxt.label + ' ' + nxt.date.getDate() + ' ' + R.dateTH(nxt.date.toISOString()).split(' ')[1]) +
         chip('date', 'เลือกวัน') + '</div>' +
         (cart.wantMode === 'date' ? '<label class="field" style="margin-top:.8rem"><span class="sr-only">วันที่ต้องการ</span><input type="date" class="input' + (badDate ? ' is-invalid' : '') + '" data-bind="wantDate" data-rerender="1" min="' + minDate + '" value="' + esc(cart.wantDate) + '">' +
           (badDate ? '<span class="field-error">ร้านหยุดวัน' + DAY_TH[new Date(cart.wantDate + 'T12:00:00').getDay()] + ' กรุณาเลือกวันอื่น</span>' : '') +
           (S.settings.SHOP_HOURS ? '<span class="field-hint">ร้านเปิด ' + esc(S.settings.SHOP_HOURS) + '</span>' : '') + '</label>' : '') +
         '</section>',
-      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="delivery-next">ไปขั้นต่อไป ' + icon('chevron') + '</button>',
+      bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="delivery-next">ถัดไป ' + icon('chevron') + '</button>',
     };
   };
 
