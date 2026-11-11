@@ -823,7 +823,7 @@
       A.products = res.products; A.zort = res.zort;
       const r = res.result;
       const im = r.images || {};
-      const head = 'ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีใน ZORT ' + r.removed : '') + ')';
+      const head = 'ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีหรือปิดใน ZORT ' + r.removed : '') + ')' + (r.inactive ? ' · ข้ามสินค้าที่ปิดใช้งาน ' + r.inactive + ' รายการ' : '');
       const imgLine = r.images ? 'รูป: ใช้รูปเดิม ' + (im.kept || 0) + ' · Drive ' + (im.drive || 0) + ' · ZORT ' + (im.zort || 0) + ' · ค้นจากเว็บ ' + (im.web || 0) + ' · ไม่มีรูป ' + (im.none || 0) : '';
       render();
       if (im.webSearch === false) {

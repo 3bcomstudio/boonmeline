@@ -211,11 +211,28 @@ function zortFetchRiceProducts_() {
   }
 
   const seen = {};
-  return list.filter(function (p) {
+  let inactive = 0;
+  const out = list.filter(function (p) {
     if (!p || p.id === undefined || seen[p.id]) return false;
     seen[p.id] = true;
-    return Number(p.producttype) !== 1;                     // ตัดสินค้าประเภท "บริการ"
+    if (Number(p.producttype) === 1) return false;          // ตัดสินค้าประเภท "บริการ"
+    if (!zortIsActive_(p)) { inactive++; return false; }    // ตัดสินค้าที่ปิดใช้งานใน ZORT (กันกรณี ZORT ไม่กรอง activestatus ให้)
+    return true;
   }).map(zortToProduct_);
+  out.inactive = inactive;
+  return out;
+}
+
+/** สินค้าเปิดใช้งานใน ZORT หรือไม่ — รองรับค่า true/false, 1/0, "1"/"0", "true"/"false", "active"/"inactive" */
+function zortIsActive_(z) {
+  const keys = ['active', 'activestatus', 'isactive', 'status'];
+  for (let i = 0; i < keys.length; i++) {
+    const v = z[keys[i]];
+    if (v === undefined || v === null || v === '') continue;
+    if (typeof v === 'boolean') return v;
+    return !/^(0|false|no|n|inactive|disabled?|closed?|off|ปิด|ไม่ใช้งาน|ปิดใช้งาน)$/i.test(String(v).trim());
+  }
+  return true;   // ZORT ไม่ส่งสถานะมา = ถือว่าเปิด (เพราะขอเฉพาะ activestatus=1 แล้ว)
 }
 
 /** แปลง product ของ ZORT เป็นรูปแบบเดียวกับแท็บ Products */
@@ -236,7 +253,7 @@ function zortToProduct_(z) {
     image: zortImageUrl_(z),
     fullName: fullName,
     category: clean_(z.category, 80),
-    active: z.active !== false,
+    active: true,                                           // ผ่านตัวกรองแล้ว = เปิดใช้งานเท่านั้น
   };
 }
 
@@ -651,7 +668,7 @@ function syncZortProducts(opts) {
   const result = withLock_(function () {
     const items = zortFetchRiceProducts_();
     if (!items.length) {
-      fail_('zort_empty', 'ดึงจาก ZORT ได้ 0 รายการ จึงยังไม่แก้แท็บ Products — ' + zortDiagnose_());
+      fail_('zort_empty', 'ดึงจาก ZORT ได้ 0 รายการ' + (items.inactive ? ' (ข้ามสินค้าที่ปิดใช้งาน ' + items.inactive + ' รายการ)' : '') + ' จึงยังไม่แก้แท็บ Products — ' + zortDiagnose_());
     }
 
     const ss = ss_();
@@ -703,7 +720,7 @@ function syncZortProducts(opts) {
     clearCache();
     const result = {
       fetched: items.length, updated: items.length - added, added: added,
-      removed: removed + gone, at: now.toISOString(),
+      removed: removed + gone, inactive: items.inactive || 0, at: now.toISOString(),
       images: imgStat,
     };
     return result;
