@@ -126,7 +126,7 @@
     }).join('');
     const z = A.zort || {};
     const last = z.lastSync;
-    const activeProducts = A.products.filter((p) => p.active).length;
+    const activeProducts = A.products.filter((p) => p.active && !(p.stock !== null && p.stock !== undefined && p.stock <= 0)).length;
     const who = (A.admin && A.admin.name) || 'แอดมิน';
     return '<div class="side-brand"><img src="assets/logo-96.png" alt=""><div><b>' + esc(shopName()) + '</b><span>ระบบหลังร้าน</span></div>' +
       '<button type="button" class="side-x" data-act="nav-close" aria-label="ปิดเมนู">' + icon('x') + '</button></div>' +
@@ -290,7 +290,9 @@
         '<span class="p-size">' + (p.sizeKg ? p.sizeKg + ' กก.' : '-') + ' / ' + esc(p.unit) + '</span>' +
         '<span class="p-price"><b>฿' + money(p.price) + '</b>' + (p.priceWholesale ? '<small>ส่ง ฿' + money(p.priceWholesale) + '</small>' : '') + '</span>' +
         '<span class="p-stock">' + stock + '</span>' +
-        '<span class="p-st"><span class="pill tone-' + (p.active ? 'green' : 'done') + '">' + (p.active ? 'ขายอยู่' : 'ซ่อน') + '</span></span>' +
+        '<span class="p-st">' + (!p.active ? '<span class="pill tone-done">ซ่อน</span>'
+          : p.stock !== null && p.stock !== undefined && p.stock <= 0 ? '<span class="pill tone-done" title="ลูกค้าจะเห็นอีกครั้งเมื่อสต็อกใน ZORT มีของ">ไม่แสดง (หมด)</span>'
+          : '<span class="pill tone-green">ขายอยู่</span>') + '</span>' +
         '</div>';
     }).join('');
   }

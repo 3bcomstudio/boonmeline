@@ -33,7 +33,6 @@ const DEFAULT_SETTINGS = [
   ['ZORT_PAYMENT_CASH', 'เงินสด', 'ZORT: ชื่อวิธีชำระเงินเมื่อจ่ายเงินสด (ให้ตรงกับที่ตั้งไว้ใน ZORT)'],
   ['WEB_IMAGE_SEARCH', 'TRUE', 'TRUE = สินค้าที่ไม่มีรูปใน Drive และ ZORT ให้ค้นรูปสินค้าจริงด้วยชื่อสินค้า (Bing Images → Open Food Facts — ฟรี ไม่ต้องใช้ key)'],
   ['WEB_IMAGE_MAX_PER_SYNC', '30', 'ค้นรูปจากเว็บได้สูงสุดกี่สินค้าต่อการซิงก์ 1 ครั้ง (รูปที่ได้เก็บไว้ ไม่ค้นซ้ำ — ที่เหลือค้นต่อรอบถัดไป)'],
-  ['ZORT_HIDE_OUT_OF_STOCK', 'FALSE', 'ZORT: TRUE = ซ่อนข้าวที่สต็อกหมดจากหน้าลูกค้า'],
 ];
 
 function setup() {

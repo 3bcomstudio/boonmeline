@@ -185,9 +185,13 @@ function getProducts_(activeOnly) {
     cache.put('products', JSON.stringify(list), 60);
   }
   if (!activeOnly) return list;
-  // ZORT_HIDE_OUT_OF_STOCK = TRUE → ซ่อนข้าวที่ผูกกับ ZORT แล้วสต็อกหมด
-  const hideOos = truthy_(getSettings_().ZORT_HIDE_OUT_OF_STOCK);
-  return list.filter(function (p) { return p.active && !(hideOos && p.zortId && p.stock !== null && p.stock <= 0); });
+  // หน้าลูกค้าแสดงเฉพาะข้าวที่สต็อกยังไม่หมด (ข้าวที่ไม่รู้สต็อก เช่น ไม่ได้มาจาก ZORT ยังแสดงตามปกติ)
+  return list.filter(function (p) { return p.active && inStock_(p); });
+}
+
+/** สต็อกยังไม่หมด — stock เป็น null = ไม่ทราบสต็อก ถือว่ามีของ */
+function inStock_(p) {
+  return p.stock === null || p.stock === undefined || p.stock > 0;
 }
 
 /** เรียกหลังแก้ชีต Settings/Products ถ้าอยากให้มีผลทันที */
