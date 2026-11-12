@@ -326,22 +326,20 @@ function driveFileId_(url) {
 /**
  * เลือกรูปตอนดึงสินค้า — สินค้าที่มีรูปอยู่แล้วใช้รูปเดิม ไม่ดึง/ค้นรูปซ้ำ
  *   1) รูปที่ร้านวางในโฟลเดอร์รูปสินค้า (ตั้งชื่อตาม SKU/ชื่อ) — ใช้ก่อนเสมอ
- *   2) รูปเดิมในแท็บ Products — ใช้ต่อ ยกเว้นไฟล์ใน Drive ถูกลบไปแล้ว หรือรูปจาก ZORT เปลี่ยน
- *   3) รูปใน ZORT  4) รูปจากเว็บที่เคยค้นเก็บไว้  5) ไม่มีรูป (ค้นใหม่หลังบันทึก)
+ *   2) รูปใน ZORT — มีรูปใน ZORT แล้วใช้เลย ไม่ค้นรูปจากที่อื่น
+ *   3) รูปเดิมในแท็บ Products (ไฟล์ใน Drive ที่ยังอยู่)  4) รูปจากเว็บที่เคยค้นเก็บไว้  5) ไม่มีรูป (ค้นใหม่หลังบันทึก)
  */
 function pickImage_(z, old, driveMap, webMap, liveIds, listingOk) {
   const own = resolveImage_(z, driveMap);
-  if (own.from === 'drive') return own;
+  if (own.from === 'drive') return own;                                       // รูปที่ร้านวางเองในโฟลเดอร์ Drive
+  if (z.image) return { url: z.image, from: 'zort' };                         // มีรูปใน ZORT → ใช้รูป ZORT เลย ไม่ใช้/ไม่ค้นรูปจากเว็บ
   const prev = old && String(old.image || '').trim();
   if (prev) {
     const id = driveFileId_(prev);
     if (id) {
       if (!listingOk || liveIds[id]) return { url: prev, from: 'kept' };      // ไฟล์ยังอยู่ (หรืออ่านโฟลเดอร์ไม่ได้ — ใช้ของเดิมไว้ก่อน)
-    } else if (!z.image || z.image === prev) {
-      return { url: prev, from: 'kept' };                                     // ลิงก์ภายนอก เช่น รูปจาก ZORT เดิม
     }
   }
-  if (z.image) return { url: z.image, from: 'zort' };
   const web = webMap[imgKey_('z' + z.zortId)];
   if (web) return { url: web, from: 'web' };
   return { url: '', from: 'none' };
