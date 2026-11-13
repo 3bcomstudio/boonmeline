@@ -103,32 +103,12 @@
         '<span class="tb-size-g" aria-hidden="true"><span class="g1">ก</span><span class="g2">ก</span></span>' +
         '<span class="tb-size-t">ตัวอักษร</span></button>' +
       '</header>' +
-      '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + siteFoot() + '</main>' +
+      '<main class="page' + (v.bar ? ' has-bar' : '') + '" id="main">' + v.body + '</main>' +
       (v.bar ? '<div class="actionbar"><div class="actionbar-in">' + v.bar + '</div></div>' : '');
   }
 
   /* ---------- ข้อมูลร้าน / ความปลอดภัย (สร้างความมั่นใจว่าเป็นร้านจริง) ---------- */
   const payeeName = () => String(S.settings.PROMPTPAY_NAME || shopName()).trim();
-  const shopMapUrl = () => {
-    const st = S.settings;
-    if (Number(st.SHOP_LAT) && Number(st.SHOP_LNG)) return R.mapUrl(Number(st.SHOP_LAT), Number(st.SHOP_LNG));
-    return st.SHOP_ADDRESS ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(shopName() + ' ' + st.SHOP_ADDRESS) : '';
-  };
-
-  function shopCard() {
-    const st = S.settings;
-    const row = (ic, html) => '<li>' + icon(ic) + '<span>' + html + '</span></li>';
-    const map = shopMapUrl();
-    return '<section class="shop-card" aria-label="ข้อมูลร้าน">' +
-      '<div class="sc-head"><img src="assets/logo.png" alt="" width="120" height="120">' +
-      '<div><strong>' + esc(shopName()) + '</strong><span>ร้านขายข้าวสาร ส่งถึงบ้าน และรับเองที่ร้าน</span></div></div>' +
-      '<ul class="sc-info">' +
-      (st.SHOP_ADDRESS ? row('store', esc(st.SHOP_ADDRESS) + (map ? ' <a href="' + esc(map) + '" target="_blank" rel="noopener">ดูแผนที่ร้าน</a>' : '')) : '') +
-      (st.SHOP_HOURS ? row('clock', 'เปิด ' + esc(st.SHOP_HOURS)) : '') +
-      (st.SHOP_PHONE ? row('phone', 'โทร ' + phoneLinks()) : '') +
-      (st.SHOP_TAX_ID ? row('receipt', 'เลขทะเบียนนิติบุคคล ' + esc(st.SHOP_TAX_ID)) : '') +
-      '</ul></section>';
-  }
 
   function safetyNote(compact) {
     const items = [
@@ -139,17 +119,6 @@
       '<div class="safety-h">' + icon('alert') + '<strong>ข้อควรรู้เพื่อความปลอดภัย</strong></div>' +
       '<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>' +
       '</aside>';
-  }
-
-  function siteFoot() {
-    if (!S.loaded) return '';
-    const st = S.settings;
-    return '<footer class="site-foot">' +
-      '<strong>' + esc(shopName()) + '</strong>' +
-      (st.SHOP_ADDRESS ? '<span>' + esc(st.SHOP_ADDRESS) + '</span>' : '') +
-      '<span>' + [st.SHOP_PHONE ? 'โทร ' + esc(R.phoneFmt(st.SHOP_PHONE)) : '', st.SHOP_TAX_ID ? 'เลขทะเบียน ' + esc(st.SHOP_TAX_ID) : ''].filter(Boolean).join(' · ') + '</span>' +
-      '<span class="sf-note">' + icon('check') + 'ข้อมูลของคุณใช้เพื่อจัดส่งข้าวและติดต่อกลับเท่านั้น</span>' +
-      '</footer>';
   }
 
   function demoBanner() {
@@ -204,18 +173,11 @@
         helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
         '<span class="badge-ic">' + icon('rice') + '</span>' +
-        '<span class="cta-text"><strong>สั่งซื้อข้าวสาร</strong><span class="cta-sub">ระบุยี่ห้อ จำนวน และรอร้านตอบกลับ</span></span></button>' +
+        '<span class="cta-text"><strong>สั่งซื้อข้าวสาร</strong></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
         menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่งซื้อ และติดตามสถานะการจัดส่ง', badge: pending.length }) +
-        menuItem({ act: 'go', to: '#/profile', icon: 'user', label: 'ข้อมูลของฉัน', sub: 'ชื่อ เบอร์โทร ที่อยู่สำหรับจัดส่ง' }) +
-        (S.settings.SHOP_PHONE ? '<a class="menu-item call" href="' + telLink() + '"><span class="mi-ic">' + icon('phone') + '</span>' +
-          '<span class="mi-text"><strong>ติดต่อร้าน</strong><span class="mi-sub">' + esc(mainPhone()) + (S.settings.SHOP_HOURS ? ' · เปิด ' + esc(S.settings.SHOP_HOURS) : '') + '</span></span>' + icon('chevron') + '</a>' : '') +
         '</nav>' +
-        '<section class="how"><h2>ใช้งานง่าย เพียง 3 ขั้นตอน</h2><ol>' +
-        '<li><b>1</b><span>ระบุยี่ห้อ และจำนวนที่ต้องการสั่งซื้อ</span></li>' +
-        '<li><b>2</b><span>รอทางร้านตอบกลับเพื่อแจ้งราคา <small>ผ่านช่องทางนี้เท่านั้น</small></span></li>' +
-        '<li><b>3</b><span>กดยืนยันราคา และชำระเงินออนไลน์ หรือชำระเงินตอนรับสินค้า</span></li></ol></section>' +
-        shopCard() + safetyNote(),
+        safetyNote(),
     };
   };
 
@@ -335,7 +297,7 @@
     }
     return {
       back: '#/', backAct: 'shop-exit', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(1, 'กรุณาเลือกยี่ห้อข้าวสารที่ต้องการ', 'แตะที่ชื่อข้าว แล้วเลือกขนาดและจำนวน') + shopFilters() +
+      body: stepHead(1, 'กรุณาเลือกยี่ห้อข้าวสารที่ต้องการ', 'แตะที่ชื่อข้าว แล้วระบุขนาดและจำนวน') + shopFilters() +
         '<div class="prod-list" id="prod-list">' + prodListHtml() + '</div>',
       bar: shopBar(),
     };
@@ -684,7 +646,7 @@
     const tiles = R.PURPOSES.map((p) => tile({ act: 'purpose', id: p.id, icon: p.icon, label: p.label, sub: p.hint, on: cart.purpose === p.id, wide: p.id === 'other' })).join('');
     return {
       back: '#/shop', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'ร้านจะคิดราคาให้เหมาะกับการใช้งานของคุณ') +
+      body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'เลือกประเภทการใช้งาน เพื่อให้ทางร้านประเมินราคาที่คุ้มค่าที่สุด') +
         '<div class="tiles">' + tiles + '</div><div id="purpose-note">' + purposeNoteField() + '</div>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ถัดไป ' + icon('chevron') + '</button>',
     };
@@ -711,7 +673,7 @@
     let detail;
     if (cart.deliveryMethod === 'delivery') {
       detail = '<section class="section"><h2 class="section-title">ระบุที่อยู่ในการจัดส่ง</h2><div class="panel">' +
-        '<label class="field"><span class="field-label">ที่อยู่</span>' +
+        '<label class="field"><span class="sr-only">ที่อยู่ในการจัดส่ง</span>' +
         '<textarea class="textarea" data-bind="address" rows="3" maxlength="500" placeholder="บ้านเลขที่ หมู่ ซอย ถนน ตำบล">' + esc(cart.address) + '</textarea>' +
         '<span class="field-hint">ถ้าส่งไปวัดหรือที่อื่น แก้ที่อยู่ตรงนี้ได้เลย</span></label>' +
         locBlock('cart', cart.lat, cart.lng) + '</div></section>';
@@ -776,7 +738,7 @@
       : 'ส่งถึงที่: ' + (cart.address || 'ตามตำแหน่งบนแผนที่');
     return {
       back: '#/delivery', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(4, 'ตรวจสอบก่อนส่ง', 'ถ้าถูกต้องแล้ว กดปุ่มสีเขียวด้านล่าง') +
+      body: stepHead(4, 'ตรวจสอบก่อนส่ง', 'หากข้อมูลถูกต้อง กรุณากดปุ่มสีเขียวด้านล่าง') +
         '<div class="bill">' +
         '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">ใบสั่งข้าว</div>' +
         '<div class="bill-meta">วันที่ ' + R.dateTH(new Date().toISOString()) + '</div></div>' +
@@ -790,9 +752,9 @@
         '</dl>' +
         '<p class="bill-wait"><strong>ราคา:</strong> ร้านจะคิดราคารวมค่าส่ง แล้วส่งมาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
         '</div>' +
-        '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่กรอกก็ได้)</span>' +
+        '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่จำเป็นต้องกรอก)</span>' +
         '<textarea class="textarea" data-bind="note" rows="2" maxlength="500" placeholder="เช่น ส่งช่วงเช้า หรือ โทรก่อนมาส่ง">' + esc(cart.note) + '</textarea></label>',
-      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งข้าวให้ร้าน</button>',
+      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งซื้อให้ร้าน</button>',
     };
   };
 
@@ -834,7 +796,7 @@
     return {
       top: shopName(),
       body: '<div class="done-hero"><div class="big-check">' + icon('check') + '</div>' +
-        '<h1 class="page-title">ส่งใบสั่งข้าวให้ร้านแล้ว</h1>' +
+        '<h1 class="page-title">ส่งใบสั่งซื้อให้ร้านแล้ว</h1>' +
         '<div class="order-no">เลขที่ ' + esc(id) + '</div>' +
         '<p>ร้านกำลังคิดราคา แล้วจะส่งราคามาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
         '<p style="margin-top:.5rem">ตอนนี้ไม่ต้องทำอะไรเพิ่ม รอข้อความจากร้านได้เลย</p></div>' +
@@ -1098,7 +1060,7 @@
         '<span class="field-hint">ถ้ามารับเองที่ร้าน ไม่ต้องกรอกก็ได้</span></label>' +
         locBlock('pf', pf.lat, pf.lng) +
         '</div>' +
-        '<p class="privacy">' + icon('check') + '<span>ร้านใช้ข้อมูลนี้เพื่อจัดส่งข้าวและโทรติดต่อคุณเท่านั้น ไม่ส่งต่อให้ผู้อื่น แก้ไขได้ทุกเมื่อที่เมนู "ข้อมูลของฉัน"</span></p>' +
+        '<p class="privacy">' + icon('check') + '<span>ร้านใช้ข้อมูลนี้เพื่อจัดส่งข้าวและโทรติดต่อคุณเท่านั้น ไม่ส่งต่อให้ผู้อื่น</span></p>' +
         '<section class="section"><h2 class="section-title">ปกติซื้อข้าวไปใช้ทำอะไร</h2><div class="tiles">' + tiles + '</div></section>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="save-profile" data-id="' + (isNew ? 'new' : '') + '">' +
         icon('check') + (isNew ? ' บันทึก แล้วเริ่มสั่งข้าว' : ' บันทึกข้อมูล') + '</button>',
@@ -1300,7 +1262,7 @@
 
   async function boot() {
     R.injectIcons();
-    app.innerHTML = splash('กำลังเปิดหน้าสั่งข้าว...');
+    app.innerHTML = splash('กำลังเข้าสู่ระบบสั่งซื้อ...');
     try {
       await R.initAuth(R.CFG.LIFF_ID);
       const data = await R.api('bootstrap');

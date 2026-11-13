@@ -11,10 +11,10 @@
 
   const PURPOSES = [
     { id: 'home', label: 'กินเอง', icon: 'home' },
-    { id: 'donate', label: 'ทำบุญ/บริจาค', icon: 'donate', notePrompt: 'ทำบุญที่ไหน หรือให้ใคร (ไม่กรอกก็ได้)' },
-    { id: 'restaurant', label: 'ร้านอาหาร', icon: 'restaurant', notePrompt: 'ชื่อร้านอาหาร (ไม่กรอกก็ได้)' },
-    { id: 'wholesale', label: 'ขายส่ง/ขายต่อ', icon: 'wholesale', notePrompt: 'ชื่อร้าน หรือกิจการ (ไม่กรอกก็ได้)' },
-    { id: 'other', label: 'อื่น ๆ', hint: 'บอกร้านเพิ่มเติมได้', icon: 'other', notePrompt: 'ซื้อข้าวไปใช้ทำอะไร', noteRequired: true },
+    { id: 'donate', label: 'ทำบุญ/บริจาค', icon: 'donate', notePrompt: 'ทำบุญที่ไหน หรือให้ใคร (ไม่จำเป็นต้องระบุ)' },
+    { id: 'restaurant', label: 'ร้านอาหาร', icon: 'restaurant', notePrompt: 'ชื่อร้านอาหาร (ไม่จำเป็นต้องระบุ)' },
+    { id: 'wholesale', label: 'ขายส่ง/ขายต่อ', icon: 'wholesale', notePrompt: 'ชื่อร้าน หรือกิจการ (ไม่จำเป็นต้องระบุ)' },
+    { id: 'other', label: 'อื่น ๆ', icon: 'other', notePrompt: 'ซื้อข้าวไปใช้ทำอะไร', noteRequired: true },
   ];
   const purposeOf = (id) => PURPOSES.find((p) => p.id === id) || PURPOSES[0];
 
