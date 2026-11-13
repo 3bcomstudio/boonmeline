@@ -10,8 +10,8 @@
   /* ---------- ค่าคงที่ ---------- */
 
   const PURPOSES = [
-    { id: 'home', label: 'กินเอง', icon: 'home' },
-    { id: 'donate', label: 'ทำบุญ/บริจาค', icon: 'donate', notePrompt: 'ทำบุญที่ไหน หรือให้ใคร (ไม่จำเป็นต้องระบุ)' },
+    { id: 'home', label: 'ทั่วไป/ใช้ส่วนตัว', icon: 'home' },
+    { id: 'donate', label: 'สำหรับถวายพระ/ทำบุญ', icon: 'donate', notePrompt: 'ทำบุญที่ไหน หรือให้ใคร (ไม่จำเป็นต้องระบุ)' },
     { id: 'restaurant', label: 'ร้านอาหาร', icon: 'restaurant', notePrompt: 'ชื่อร้านอาหาร (ไม่จำเป็นต้องระบุ)' },
     { id: 'wholesale', label: 'ขายส่ง/ขายต่อ', icon: 'wholesale', notePrompt: 'ชื่อร้าน หรือกิจการ (ไม่จำเป็นต้องระบุ)' },
     { id: 'other', label: 'อื่น ๆ', icon: 'other', notePrompt: 'ซื้อข้าวไปใช้ทำอะไร', noteRequired: true },

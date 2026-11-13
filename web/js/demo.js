@@ -7,7 +7,7 @@
   const KEY = 'rice_demo_db_v3';
   const ME = { userId: 'Udemo-me', name: 'สมศรี ใจดี', picture: '' };
 
-  const PURPOSE_LABEL = { home: 'กินเอง', donate: 'ทำบุญ/บริจาค', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง/ขายต่อ', other: 'อื่น ๆ' };
+  const PURPOSE_LABEL = { home: 'ทั่วไป/ใช้ส่วนตัว', donate: 'สำหรับถวายพระ/ทำบุญ', restaurant: 'ร้านอาหาร', wholesale: 'ขายส่ง/ขายต่อ', other: 'อื่น ๆ' };
   const TRANS = {
     new: ['cancelled'], quoted: ['confirmed', 'cancelled'], confirmed: ['paid', 'shipping', 'done', 'cancelled'],
     slip: ['paid', 'confirmed', 'cancelled'], paid: ['shipping', 'done', 'cancelled'], shipping: ['done', 'cancelled'], done: ['cancelled'],
