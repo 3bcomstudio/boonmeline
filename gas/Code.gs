@@ -17,8 +17,8 @@
 const APP_VERSION = '1.0.0';
 
 const PURPOSES = {
-  home: 'กินเอง',
-  donate: 'ทำบุญ/บริจาค',
+  home: 'ทั่วไป/ใช้ส่วนตัว',
+  donate: 'สำหรับถวยพระ/ทำบุญ',
   restaurant: 'ร้านอาหาร',
   wholesale: 'ขายส่ง/ขายต่อ',
   other: 'อื่น ๆ',
