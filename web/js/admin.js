@@ -136,7 +136,6 @@
       '<div class="nav-g"><div class="nav-h">สินค้า</div>' +
       item({ act: 'view', id: 'products', icon: 'rice', label: 'สินค้าข้าว', badge: activeProducts, active: A.view === 'products' }) +
       (!R.DEMO ? item({ act: 'zort', icon: 'refresh', label: 'ดึงสินค้าจาก ZORT', sub: last ? 'ล่าสุด ' + R.dateTH(last.at, true) : 'ยังไม่เคยดึง' }) : '') +
-      (z.imageFolderUrl ? item({ href: z.imageFolderUrl, icon: 'image', label: 'โฟลเดอร์รูปสินค้า' }) : '') +
       '</div>' +
       '<div class="nav-g"><div class="nav-h">ร้านและเครื่องมือ</div>' +
       item({ act: 'view', id: 'shop', icon: 'store', label: 'ข้อมูลร้าน', active: A.view === 'shop' }) +
@@ -303,9 +302,8 @@
     return '<div class="toolbar">' +
       '<div class="search grow">' + icon('search') + '<input type="search" id="pq" placeholder="ค้นหาชื่อข้าว SKU หมวด ขนาด" value="' + esc(A.pq) + '" aria-label="ค้นหาสินค้า"></div>' +
       (!R.DEMO ? '<button type="button" class="btn btn-primary btn-sm" data-act="zort">' + icon('refresh') + ' ดึงสินค้าจาก ZORT</button>' : '') +
-      (z.imageFolderUrl ? '<a class="btn btn-ghost btn-sm" href="' + esc(z.imageFolderUrl) + '" target="_blank" rel="noopener">' + icon('image') + ' โฟลเดอร์รูป</a>' : '') +
       '</div>' +
-      (noImg ? '<p class="hint-line">' + icon('image') + 'ยังไม่มีรูป ' + noImg + ' รายการ — กด "ดึงสินค้าจาก ZORT" ระบบจะค้นรูปตามชื่อสินค้าให้ หรือวางรูปในโฟลเดอร์รูปสินค้า</p>' : '') +
+      (noImg ? '<p class="hint-line">' + icon('image') + 'ยังไม่มีรูป ' + noImg + ' รายการ — ใส่รูปที่สินค้าในระบบ ZORT แล้วกด "ดึงสินค้าจาก ZORT"</p>' : '') +
       '<div class="panel p-table"><div class="p-head"><span></span><span>สินค้า</span><span>ขนาด</span><span>ราคาปลีก / ส่ง</span><span>สต็อก</span><span>สถานะ</span></div>' +
       '<div id="prows">' + productRows() + '</div></div>' +
       '<p class="muted small" style="margin-top:.7rem">แก้ชื่อ ราคา สต็อก ในระบบ ZORT แล้วกด "ดึงสินค้าจาก ZORT" — ราคาส่งและลำดับแก้ได้ในแท็บ Products ของ Google Sheet</p>';
@@ -334,7 +332,7 @@
       row('ZORT', z.configured ? '<span class="pill tone-green">เชื่อมแล้ว</span>' : '<span class="pill tone-done">ยังไม่ตั้งค่า</span>') +
       row('บันทึกยอดขาย', z.pushOrders ? 'อัตโนมัติเมื่อปิดการขาย' : 'ปิดอยู่') +
       row('แจ้งเตือนแอดมิน', yes(s.ADMIN_NOTIFY) ? 'ส่ง LINE เมื่อมีคำสั่งซื้อใหม่' : 'ปิดอยู่') +
-      row('ค้นรูปสินค้า', yes(s.WEB_IMAGE_SEARCH === undefined ? 'TRUE' : s.WEB_IMAGE_SEARCH) ? 'เปิด (ตามชื่อสินค้า)' : 'ปิดอยู่') + '</dl></section>' +
+      row('รูปสินค้า', 'ใช้รูปจาก ZORT') + '</dl></section>' +
       '</div>' +
       '<div class="panel edit-note">' + icon('sheet') + '<div><b>ต้องการแก้ข้อมูลร้าน?</b><span>แก้ได้ที่แท็บ <b>Settings</b> ใน Google Sheet แล้วกดรีเฟรช หน้าลูกค้าจะอัปเดตภายใน 1 นาที</span></div>' +
       (A.sheetUrl ? '<a class="btn btn-primary btn-sm" href="' + esc(A.sheetUrl) + '" target="_blank" rel="noopener">เปิด Google Sheet</a>' : '') + '</div>';
@@ -812,6 +810,35 @@
     return l ? 'ซิงก์ล่าสุด ' + new Date(l.at).toLocaleString('th-TH') + ' — ' + l.fetched + ' รายการ' : 'ยังไม่เคยซิงก์';
   }
 
+  /** รายงานผลการดึงสินค้า: มาจาก ZORT กี่รายการ ถูกข้ามเพราะอะไร สต็อกหมดกี่รายการ รูปจาก ZORT */
+  function zortReport(r) {
+    const d = r.diag || {};
+    const im = r.images || {};
+    const kv = (k, v, tone) => '<tr><th style="text-align:left;font-weight:500;padding:4px 10px 4px 0">' + k + '</th><td style="text-align:right;padding:4px 0"><b' + (tone ? ' style="color:' + tone + '"' : '') + '>' + v + '</b></td></tr>';
+    const skipped = (d.skipped || []).map((x) => '<li style="margin:3px 0"><b>' + esc(x.name) + '</b> <span class="muted">— ' + esc(x.why) + '</span></li>').join('');
+    const oos = (r.outOfStock || []).map((n) => '<li style="margin:3px 0">' + esc(n) + '</li>').join('');
+    const lost = (d.notMatched || 0) + (d.service || 0) + (d.inactive || 0);
+    R.modal({
+      title: 'ดึงสินค้าจาก ZORT เสร็จ',
+      html: '<p class="muted">ตัวกรอง: ' + esc(d.filter || '-') + ' · คลัง: ' + esc(d.warehouse || '-') + (d.zortCount ? ' · ZORT แจ้งว่ามี ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า)' : '') + '</p>' +
+        '<table style="width:100%;border-collapse:collapse;margin:.4rem 0 .8rem">' +
+        kv('ได้รับจาก ZORT', (d.raw != null ? d.raw : r.fetched) + ' รายการ') +
+        (d.notMatched ? kv('ข้าม — ไม่ตรงคำค้น', d.notMatched, '#b54708') : '') +
+        (d.service ? kv('ข้าม — สินค้าบริการ', d.service, '#b54708') : '') +
+        (d.inactive ? kv('ข้าม — ปิดใช้งานใน ZORT', d.inactive, '#b54708') : '') +
+        (d.dup ? kv('รายการซ้ำ (นับครั้งเดียว)', d.dup) : '') +
+        kv('ดึงเข้าระบบ', r.fetched + ' รายการ (ใหม่ ' + r.added + ')', '#067647') +
+        ((r.outOfStock || []).length ? kv('สต็อกหมด — ไม่แสดงหน้าลูกค้า', r.outOfStock.length, '#b42318') : '') +
+        kv('รูปจาก ZORT', (im.zort || 0) + ' มีรูป · ' + (im.none || 0) + ' ไม่มีรูป') +
+        '</table>' +
+        (lost && skipped ? '<details' + (lost <= 20 ? ' open' : '') + '><summary><b>สินค้าที่ถูกข้าม</b>' + (lost > (d.skipped || []).length ? ' (แสดง ' + d.skipped.length + ' จาก ' + lost + ')' : '') + '</summary><ul style="padding-left:18px;max-height:30vh;overflow:auto">' + skipped + '</ul></details>' : '') +
+        (oos ? '<details><summary><b>สินค้าที่สต็อกหมด</b> (ลูกค้าจะเห็นเมื่อ ZORT มีของ)</summary><ul style="padding-left:18px;max-height:30vh;overflow:auto">' + oos + '</ul></details>' : '') +
+        (d.notMatched ? '<p class="muted" style="margin-top:.6rem">ถ้าสินค้าที่ไม่ตรงคำค้นเป็นข้าวด้วย แก้ <code>ZORT_KEYWORD</code> ในแท็บ Settings (คั่นหลายคำด้วย ,) หรือล้างค่าเพื่อดึงทั้งร้าน</p>' : '') +
+        (im.detailLeft ? '<p class="muted">ยังตรวจรูปไม่ครบ เหลือ ' + im.detailLeft + ' รายการ กดดึงอีกครั้งเพื่อตรวจต่อ</p>' : ''),
+      actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }],
+    });
+  }
+
   async function zortSync() {
     if (!A.zort) {
       return R.modal({ title: 'ยังดึงสินค้าจาก ZORT ไม่ได้', html: '<p>Apps Script ยังเป็นเวอร์ชันเก่า กรุณาอัปโหลดไฟล์ใน <code>gas/</code> (รวม <code>Zort.gs</code>) แล้ว Deploy เป็น New version</p>', actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }] });
@@ -824,26 +851,8 @@
       const res = await R.api('adminZortSync');
       A.products = res.products; A.zort = res.zort;
       const r = res.result;
-      const im = r.images || {};
-      const head = 'ดึงข้าวจาก ZORT ' + r.fetched + ' รายการ (ใหม่ ' + r.added + (r.removed ? ', ลบที่ไม่มีหรือปิดใน ZORT ' + r.removed : '') + ')' + (r.inactive ? ' · ข้ามสินค้าที่ปิดใช้งาน ' + r.inactive + ' รายการ' : '');
-      const imgLine = r.images ? 'รูป: ใช้รูปเดิม ' + (im.kept || 0) + ' · Drive ' + (im.drive || 0) + ' · ZORT ' + (im.zort || 0) + ' · ค้นจากเว็บ ' + (im.web || 0) + ' · ไม่มีรูป ' + (im.none || 0) : '';
       render();
-      if (im.webSearch === false) {
-        R.toast(head + ' · ' + imgLine + ' (ปิดการค้นรูปจากเว็บอยู่ — WEB_IMAGE_SEARCH ในแท็บ Settings)', 'ok');
-      } else if ((im.log && im.log.length) || im.webError) {
-        const rows = (im.log || []).map((x) => '<li style="margin:4px 0">' + (x.ok ? '✅ ' : '❌ ') + '<b>' + esc(x.name) + '</b><br><span class="muted">' + esc(x.note || '') + '</span></li>').join('');
-        R.modal({
-          title: 'ดึงสินค้าเสร็จ — ผลการค้นรูปตามชื่อสินค้า',
-          html: '<p>' + esc(head) + '<br>' + esc(imgLine) + '</p>' +
-            (im.webError ? '<p class="err" style="color:#b42318">⚠️ ' + esc(im.webError) + '</p>' : '') +
-            (rows ? '<ul style="padding-left:4px;list-style:none;max-height:50vh;overflow:auto">' + rows + '</ul>' : '') +
-            (im.waiting ? '<p class="muted">ยังเหลือ ' + im.waiting + ' รายการ กดดึงอีกครั้งเพื่อค้นต่อ</p>' : '') +
-            '<p class="muted">รูปที่ได้เก็บในโฟลเดอร์ "รูปจากเว็บ (อัตโนมัติ)" — รูปไหนไม่ถูก ลบไฟล์ทิ้งแล้วกดดึงอีกครั้ง หรือวางรูปของร้านในโฟลเดอร์รูปสินค้า (ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า) ระบบใช้รูปนั้นก่อนเสมอ</p>',
-          actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }],
-        });
-      } else {
-        R.toast(head + (imgLine ? ' · ' + imgLine : '') + (im.none ? '' : ' · สินค้าทุกตัวมีรูปแล้ว'), 'ok');
-      }
+      zortReport(r);
     } catch (e) {
       R.busy(false);
       if (String(e.code || '').indexOf('zort') === 0) {

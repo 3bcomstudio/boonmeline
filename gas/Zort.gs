@@ -25,7 +25,7 @@
  *   zortListCategories()  — แสดงหมวดสินค้าทั้งหมดพร้อม id
  *   zortPreview()         — แสดงสินค้าที่จะถูกดึง (ยังไม่เขียนชีต)
  *   syncZortProducts()    — ล้างแท็บ Products แล้วเขียนสินค้าข้าวจาก ZORT ลงไปใหม่ (ลบข้าวเดิมที่ไม่ได้มาจาก ZORT)
- *   productImageFolder()  — แสดงลิงก์โฟลเดอร์รูปสินค้าใน Google Drive (ตั้งชื่อไฟล์ตาม SKU/ชื่อสินค้า)
+ *   zortCheck()           — ตรวจว่าสินค้าในคลัง ZORT มาครบไหม (แสดงรายการที่ถูกข้ามพร้อมเหตุผล)
  *   previewZortOrder()    — ดูข้อมูลยอดขายที่จะส่งเข้า ZORT (ไม่ส่งจริง)
  *   pushPendingOrdersToZort() — ส่งยอดขายที่ปิดแล้วแต่ยังไม่ได้บันทึกใน ZORT
  *   installZortTrigger()  — ตั้งให้ซิงก์อัตโนมัติทุก 1 ชั่วโมง
@@ -149,16 +149,25 @@ function zortDiagnose_() {
 }
 
 /** ดึงสินค้าทุกหน้าตามเงื่อนไข (คืน array ของ product object จาก ZORT) */
-function zortGetAllProducts_(filter) {
+function zortGetAllProducts_(filter, info) {
   const out = [];
+  let prevFirst = null, count = 0, pages = 0;
   for (let page = 1; page <= ZORT_MAX_PAGES; page++) {
     const q = Object.assign({}, filter || {}, { page: page, limit: ZORT_PAGE_LIMIT });
     const data = zortGet_('Product/GetProducts', q);
     const list = zortList_(data);
+    if (!list.length) break;
+    const first = list[0] && list[0].id;
+    if (page > 1 && first === prevFirst) break;               // ZORT ส่งหน้าเดิมซ้ำ (ไม่รองรับ page) — หยุด
+    prevFirst = first;
+    pages++;
     Array.prototype.push.apply(out, list);
-    const count = Number(data.count) || 0;
-    if (!list.length || list.length < ZORT_PAGE_LIMIT || (count && out.length >= count)) break;
+    count = Math.max(count, Number(data.count) || 0);
+    // หยุดเมื่อครบตามจำนวนที่ ZORT บอก — ไม่ใช้ "ได้น้อยกว่า 500" เพราะ ZORT อาจจำกัดต่อหน้าน้อยกว่าที่ขอ
+    if (count && out.length >= count) break;
+    if (!count && list.length < ZORT_PAGE_LIMIT && page > 1) break;
   }
+  if (info) { info.pages = (info.pages || 0) + pages; info.count = (info.count || 0) + count; }
   return out;
 }
 
@@ -192,40 +201,57 @@ function zortFetchRiceProducts_() {
   };
   const catIds = String(s.ZORT_CATEGORY_IDS || '').split(/[,\s]+/).filter(function (x) { return /^\d+$/.test(x); });
   const keyword = String(s.ZORT_KEYWORD || '').trim();
+  const info = {};
+  const diag = {
+    filter: catIds.length ? 'หมวด ' + catIds.join(', ') : keyword ? 'คำค้น "' + keyword + '"' : 'ทั้งร้าน',
+    warehouse: base.warehousecode || 'ทุกคลัง',
+    raw: 0, notMatched: 0, service: 0, inactive: 0, dup: 0, kept: 0,
+    skipped: [],                                           // ตัวอย่างสินค้าที่ถูกข้าม { name, why }
+  };
+  const skip = function (p, why) { if (diag.skipped.length < 60) diag.skipped.push({ name: String(p.name || '#' + p.id), why: why }); };
 
   let list = [];
   if (catIds.length) {
     catIds.forEach(function (id) {
-      list = list.concat(zortGetAllProducts_(Object.assign({ categoryid: id }, base)));
+      list = list.concat(zortGetAllProducts_(Object.assign({ categoryid: id }, base), info));
     });
   } else if (keyword) {
     // กรองคำค้นเองในชื่อ/หมวด/SKU แทนการส่ง keyword ให้ ZORT (ช่องค้นหาของ ZORT ค้นภาษาไทยไม่เจอในบางร้าน)
     // คั่นหลายคำด้วย , เช่น "ข้าว, rice"
     const words = keyword.split(',').map(function (w) { return w.trim().toLowerCase(); }).filter(String);
-    list = zortGetAllProducts_(base).filter(function (p) {
+    const all = zortGetAllProducts_(base, info);
+    diag.raw = all.length;
+    list = all.filter(function (p) {
       const text = [p.name, p.category, p.sku].join(' ').toLowerCase();
-      return words.some(function (w) { return text.indexOf(w) >= 0; });
+      const ok = words.some(function (w) { return text.indexOf(w) >= 0; });
+      if (!ok) { diag.notMatched++; skip(p, 'ไม่มีคำว่า ' + words.join(' / ') + ' ในชื่อ หมวด หรือ SKU'); }
+      return ok;
     });
   } else {
-    list = zortGetAllProducts_(base);
+    list = zortGetAllProducts_(base, info);
   }
+  if (!diag.raw) diag.raw = list.length;
+  diag.zortCount = info.count || 0;
+  diag.pages = info.pages || 0;
 
   const seen = {};
-  let inactive = 0;
   const out = list.filter(function (p) {
-    if (!p || p.id === undefined || seen[p.id]) return false;
+    if (!p || p.id === undefined) return false;
+    if (seen[p.id]) { diag.dup++; return false; }
     seen[p.id] = true;
-    if (Number(p.producttype) === 1) return false;          // ตัดสินค้าประเภท "บริการ"
-    if (!zortIsActive_(p)) { inactive++; return false; }    // ตัดสินค้าที่ปิดใช้งานใน ZORT (กันกรณี ZORT ไม่กรอง activestatus ให้)
+    if (Number(p.producttype) === 1) { diag.service++; skip(p, 'เป็นสินค้าประเภทบริการ'); return false; }
+    if (!zortIsActive_(p)) { diag.inactive++; skip(p, 'ปิดใช้งานใน ZORT'); return false; }
     return true;
   }).map(zortToProduct_);
-  out.inactive = inactive;
+  diag.kept = out.length;
+  out.inactive = diag.inactive;
+  out.diag = diag;
   return out;
 }
 
 /** สินค้าเปิดใช้งานใน ZORT หรือไม่ — รองรับค่า true/false, 1/0, "1"/"0", "true"/"false", "active"/"inactive" */
 function zortIsActive_(z) {
-  const keys = ['active', 'activestatus', 'isactive', 'status'];
+  const keys = ['active', 'activestatus', 'isactive'];
   for (let i = 0; i < keys.length; i++) {
     const v = z[keys[i]];
     if (v === undefined || v === null || v === '') continue;
@@ -249,7 +275,7 @@ function zortToProduct_(z) {
     sizeKg: zortSizeKg_(fullName, z.weight),
     unit: clean_(z.unittext, 20) || 'ถุง',
     price: round2_(num_(z.sellprice)),
-    stock: num_(z.availablestock),
+    stock: zortStock_(z),
     image: zortImageUrl_(z),
     fullName: fullName,
     category: clean_(z.category, 80),
@@ -257,386 +283,49 @@ function zortToProduct_(z) {
   };
 }
 
+/** สต็อกพร้อมขาย — ZORT ไม่ส่งตัวเลขมา = null (ไม่ทราบ ยังแสดงขาย) */
+function zortStock_(z) {
+  const keys = ['availablestock', 'stock'];
+  for (let i = 0; i < keys.length; i++) {
+    const v = z[keys[i]];
+    if (v !== undefined && v !== null && v !== '' && isFinite(Number(v))) return Number(v);
+  }
+  return null;
+}
+
 /** รูปจาก ZORT: imagepath ก่อน ถ้าไม่มีใช้รูปแรกใน imageList (เฉพาะ https) */
 function zortImageUrl_(z) {
-  const list = [z.imagepath].concat(Array.isArray(z.imageList) ? z.imageList : []);
+  const list = [z.imagepath, z.image, z.imageurl].concat(Array.isArray(z.imageList) ? z.imageList : [], Array.isArray(z.images) ? z.images : []);
   for (let i = 0; i < list.length; i++) {
-    const u = String(list[i] || '').trim();
+    const it = list[i];
+    let u = String((it && typeof it === 'object' ? (it.url || it.imagepath || it.path) : it) || '').trim();
+    if (/^\/\//.test(u)) u = 'https:' + u;
+    if (/^http:\/\//i.test(u)) u = 'https://' + u.slice(7);
     if (/^https:\/\//i.test(u)) return u;
   }
   return '';
 }
 
-/* =========================================================
- * รูปสินค้าจาก Google Drive — โฟลเดอร์ "รูปสินค้า — ระบบสั่งข้าว"
- *   ตั้งชื่อไฟล์ตาม SKU หรือชื่อสินค้า แล้ววางในโฟลเดอร์ ระบบจับคู่ให้ทุกครั้งที่ซิงก์
- *   ลำดับการจับคู่: SKU → ชื่อเต็มใน ZORT (มีขนาด) → ชื่อสินค้า (ใช้ร่วมทุกขนาด)
- *   ไม่สนตัวพิมพ์ ช่องว่าง จุด และนามสกุลไฟล์ เช่น "ข้าวหอมมะลิ 5 กก.jpg" = "ข้าวหอมมะลิ5กก"
- * ========================================================= */
-
-function productImageFolder_() {
+/** สินค้าที่ไม่มีรูปในรายการ → ขอรายละเอียดสินค้าจาก ZORT เพื่อหารูป (จำกัดจำนวน/เวลา กันซิงก์นาน) */
+const ZORT_DETAIL_IMG_MAX = 60;
+function fillZortImages_(items, startedAt) {
+  const stat = { detail: 0, found: 0, left: 0 };
   const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('PRODUCT_IMG_FOLDER_ID');
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* สร้างใหม่ */ } }
-  const folder = DriveApp.createFolder('รูปสินค้า — ระบบสั่งข้าว');
-  folder.setDescription('ตั้งชื่อไฟล์รูปตาม SKU หรือชื่อสินค้าใน ZORT เช่น P0002.jpg หรือ ข้าวหอมมะลิ ตราฉัตรทอง.jpg — ระบบจับคู่ให้ทุกครั้งที่ดึงสินค้าจาก ZORT');
-  props.setProperty('PRODUCT_IMG_FOLDER_ID', folder.getId());
-  return folder;
-}
-
-const imgKey_ = function (s) {
-  return String(s || '').replace(/\.(jpe?g|png|webp|gif|heic)$/i, '').toLowerCase().replace(/[\s.]+/g, '');
-};
-
-/** อ่านรูปทั้งหมดในโฟลเดอร์ → { คีย์ชื่อ: url } (เปิดสิทธิ์ "ทุกคนที่มีลิงก์ดูได้" ให้เอง) */
-function driveImageMap_() {
-  const map = {};
-  const folder = productImageFolder_();
-  const it = folder.getFiles();
-  while (it.hasNext()) {
-    const f = it.next();
-    if (!/^image\//.test(f.getMimeType())) continue;
-    try {
-      if (f.getSharingAccess() !== DriveApp.Access.ANYONE_WITH_LINK && f.getSharingAccess() !== DriveApp.Access.ANYONE) {
-        f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      }
-    } catch (e) { console.error('ตั้งสิทธิ์รูป ' + f.getName() + ' ไม่ได้: ' + e.message); continue; }
-    // ลิงก์รูปขนาดพอดีมือถือ (https) ใช้ได้ทั้งหน้าเว็บและข้อความ LINE
-    map[imgKey_(f.getName())] = 'https://lh3.googleusercontent.com/d/' + f.getId() + '=w600';
-  }
-  return map;
-}
-
-/** เลือกรูปของสินค้า: รูปใน Drive (ร้านเลือกเอง) ก่อน → รูปจาก ZORT → ไม่มีรูป */
-function resolveImage_(z, driveMap) {
-  const keys = [z.sku, z.fullName, z.name];
-  for (let i = 0; i < keys.length; i++) {
-    const k = imgKey_(keys[i]);
-    if (k && driveMap[k]) return { url: driveMap[k], from: 'drive' };
-  }
-  if (z.image) return { url: z.image, from: 'zort' };
-  return { url: '', from: 'none' };
-}
-
-function driveFileId_(url) {
-  const m = String(url || '').match(/googleusercontent\.com\/d\/([^=/?]+)/);
-  return m ? m[1] : '';
-}
-
-/**
- * เลือกรูปตอนดึงสินค้า — สินค้าที่มีรูปอยู่แล้วใช้รูปเดิม ไม่ดึง/ค้นรูปซ้ำ
- *   1) รูปที่ร้านวางในโฟลเดอร์รูปสินค้า (ตั้งชื่อตาม SKU/ชื่อ) — ใช้ก่อนเสมอ
- *   2) รูปใน ZORT — มีรูปใน ZORT แล้วใช้เลย ไม่ค้นรูปจากที่อื่น
- *   3) รูปเดิมในแท็บ Products (ไฟล์ใน Drive ที่ยังอยู่)  4) รูปจากเว็บที่เคยค้นเก็บไว้  5) ไม่มีรูป (ค้นใหม่หลังบันทึก)
- */
-function pickImage_(z, old, driveMap, webMap, liveIds, listingOk) {
-  const own = resolveImage_(z, driveMap);
-  if (own.from === 'drive') return own;                                       // รูปที่ร้านวางเองในโฟลเดอร์ Drive
-  if (z.image) return { url: z.image, from: 'zort' };                         // มีรูปใน ZORT → ใช้รูป ZORT เลย ไม่ใช้/ไม่ค้นรูปจากเว็บ
-  const prev = old && String(old.image || '').trim();
-  if (prev) {
-    const id = driveFileId_(prev);
-    if (id) {
-      if (!listingOk || liveIds[id]) return { url: prev, from: 'kept' };      // ไฟล์ยังอยู่ (หรืออ่านโฟลเดอร์ไม่ได้ — ใช้ของเดิมไว้ก่อน)
-    }
-  }
-  const web = webMap[imgKey_('z' + z.zortId)];
-  if (web) return { url: web, from: 'web' };
-  return { url: '', from: 'none' };
-}
-
-/* =========================================================
- * รูปจากอินเทอร์เน็ต (ฟรี ไม่ต้องสมัคร ไม่ต้องใช้ key) — ใช้เมื่อไม่มีรูปใน Drive และใน ZORT
- *   1) ค้นรูปสินค้าจริงด้วยชื่อสินค้า + ขนาด ใน Bing Images (รูปถุงจากร้านค้าออนไลน์)
- *   2) ไม่เจอ → Open Food Facts (ฐานข้อมูลสินค้าอาหารแบบเปิด, CC BY-SA)
- *   รับเฉพาะผลที่ยี่ห้อตรง (ถ้าชื่อมียี่ห้อ) หรือชนิดข้าวตรง — ไม่ตรงพอ = ไม่ใส่รูป
- *   แท็บ Settings:   WEB_IMAGE_SEARCH = TRUE/FALSE, WEB_IMAGE_MAX_PER_SYNC = จำนวนค้นสูงสุดต่อการซิงก์
- *   รูปที่ได้ดาวน์โหลดเก็บในโฟลเดอร์ย่อย "รูปจากเว็บ (อัตโนมัติ)" ชื่อไฟล์ z<zortId> และบันทึกลิงก์ในแท็บ Products → ครั้งต่อไปใช้ไฟล์เดิม ไม่ค้นซ้ำ
- *   ไม่ถูกใจรูป: ลบไฟล์นั้นทิ้ง (ระบบจะค้นใหม่) หรือวางรูปที่ถูกต้องในโฟลเดอร์หลัก (ใช้ก่อนเสมอ)
- * ========================================================= */
-
-const OFF_SEARCH_URL = 'https://search.openfoodfacts.org/search';
-const OFF_UA = 'BoonmeeHatyaiRiceShop/1.0 (Google Apps Script)';
-const WEB_IMG_RETRY_DAYS = 7;   // ค้นไม่เจอ → รอ 7 วันค่อยค้นใหม่
-// คำที่บอกว่าเป็นอาหารสำเร็จรูป/ขนม ไม่ใช่ข้าวสาร
-const OFF_NOT_RAW_RE = /พร้อมทาน|ข้าวสวย|ขนม|อบกรอบ|เกรียบ|หมู|ไก่|กุ้ง|ปลา|ผัด|แกง|ลาบ|โจ๊ก|ต้ม|ไข่|ทูน่า|กะเพรา|คลุก|ห่อ|แท่ง|ready|snack|cracker|chicken|pork/i;
-
-function webImageFolder_() {
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('WEB_IMG_FOLDER_ID');
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* สร้างใหม่ */ } }
-  const folder = productImageFolder_().createFolder('รูปจากเว็บ (อัตโนมัติ)');
-  folder.setDescription('รูปที่ระบบค้นจากอินเทอร์เน็ตให้อัตโนมัติ — ชื่อไฟล์ z<รหัสสินค้า ZORT> ลบทิ้งได้ถ้ารูปไม่ถูก (ระบบจะค้นใหม่) หรือวางรูปที่ถูกต้องในโฟลเดอร์หลักแทน');
-  props.setProperty('WEB_IMG_FOLDER_ID', folder.getId());
-  return folder;
-}
-
-/** { 'z123': url } ของรูปที่เคยค้นและเก็บไว้แล้ว */
-function webImageMap_() {
-  const map = {};
-  const it = webImageFolder_().getFiles();
-  while (it.hasNext()) {
-    const f = it.next();
-    if (!/^image\//.test(f.getMimeType())) continue;
-    if (/Wikimedia Commons/.test(f.getDescription() || '')) { f.setTrashed(true); continue; }   // ภาพประกอบเมล็ดข้าวรุ่นก่อน → ค้นรูปสินค้าใหม่
-    map[imgKey_(f.getName())] = 'https://lh3.googleusercontent.com/d/' + f.getId() + '=w600';
-  }
-  return map;
-}
-
-function offNorm_(s) { return String(s || '').toLowerCase().replace(/[\s.\-_()%]+/g, ''); }
-
-/** แยกชื่อสินค้า → { type: 'ข้าวหอมมะลิ', brands: ['ฉัตรทอง'], query } (ตัดขนาด เช่น 5 กก. ออก) */
-function offParseName_(name) {
-  const base = String(name || '').replace(/\d+(\.\d+)?\s*(กก\.?|กิโลกรัม|กิโล|kg|กรัม|g)(?![a-zก-๙])/gi, ' ').replace(/\s+/g, ' ').trim();
-  let type = '';
-  const brands = [];
-  base.split(' ').forEach(function (w) {
-    if (!w || w === 'ตรา') return;
-    const m = w.match(/^(.*?)ตรา(.+)$/);              // "ข้าวหอมมะลิตราฉัตร" หรือ "ตราฉัตร"
-    if (m) {
-      if (m[1] && !type && m[1].indexOf('ข้าว') >= 0) type = m[1];
-      brands.push(m[2]);
-      return;
-    }
-    if (!type && w.indexOf('ข้าว') >= 0) { type = w; return; }
-    if (/^\d+%?$/.test(w)) return;                    // "100%"
-    brands.push(w);
-  });
-  return {
-    type: type || 'ข้าว',
-    brands: brands.filter(function (b) { return b.length >= 2; }),
-    query: base.indexOf('ข้าว') < 0 ? 'ข้าว ' + base : base,
-  };
-}
-
-function offKg_(q) {
-  const m = String(q || '').toLowerCase().replace(/,/g, '.').match(/([\d.]+)\s*(kg|กก|กิโล|g|กรัม)/);
-  if (!m) return 0;
-  const n = Number(m[1]) || 0;
-  return /^(kg|กก|กิโล)/.test(m[2]) ? n : n / 1000;
-}
-
-/** เลือกผลที่ตรงที่สุดจาก Open Food Facts — ไม่ตรงพอคืน null */
-function offPickBest_(name, sizeKg, hits) {
-  const want = offParseName_(name);
-  const type = offNorm_(want.type);
-  let best = null;
-  (hits || []).forEach(function (h) {
-    const pname = String(h.product_name || '');
-    if (!h.image_front_url || !pname) return;
-    if (OFF_NOT_RAW_RE.test(pname) && !OFF_NOT_RAW_RE.test(name)) return;      // อาหารสำเร็จรูป/ขนม
-    const kg = offKg_(h.quantity);
-    if (kg && kg < 0.5) return;                                                // ถุงเล็กแบบพร้อมทาน
-    const brandList = [].concat(h.brands || []);
-    const text = offNorm_(pname + ' ' + brandList.join(' '));
-    if (text.indexOf(type) < 0) return;                                        // ชนิดข้าวต้องตรง
-    const hb = brandList.map(offNorm_).filter(function (b) { return b.length >= 4; });
-    const brandHit = want.brands.filter(function (b) {
-      const nb = offNorm_(b);
-      return text.indexOf(nb) >= 0 || hb.some(function (x) { return nb.indexOf(x) >= 0; });
-    }).length;
-    if (want.brands.length && !brandHit) return;                               // มียี่ห้อแต่ไม่ตรง → ไม่เอา (กันรูปยี่ห้ออื่น)
-    let score = 10 + brandHit * 5;
-    if (sizeKg && kg && Math.abs(kg - sizeKg) < 0.01) score += 2;
-    if (!best || score > best.score) best = { score: score, hit: h };
-  });
-  return best ? best.hit : null;
-}
-
-/** ค้นใน Open Food Facts — คืนรายการผล (โยน web_img_down ถ้าบริการล่มชั่วคราว) */
-function offSearch_(query) {
-  const q = query + ' categories_tags:"en:rices"';
-  const res = UrlFetchApp.fetch(OFF_SEARCH_URL + '?' + [
-    'q=' + encodeURIComponent(q), 'langs=th,en', 'page_size=20',
-    'fields=' + encodeURIComponent('product_name,brands,image_front_url,quantity,code'),
-  ].join('&'), { headers: { 'User-Agent': OFF_UA, Accept: 'application/json' }, muteHttpExceptions: true });
-  const http = res.getResponseCode();
-  if (http !== 200) fail_('web_img_down', 'Open Food Facts ใช้งานไม่ได้ตอนนี้ (HTTP ' + http + ')');
-  const d = parseJson_(res.getContentText(), null);
-  if (!d) fail_('web_img_down', 'Open Food Facts ตอบกลับผิดรูปแบบ');
-  return d.hits || [];
-}
-
-/*
- * ค้นรูปสินค้าจริงตามชื่อ จากหน้าค้นรูปของ Bing (ฟรี ไม่ต้องใช้ key)
- * ผลส่วนใหญ่เป็นรูปถุงข้าวจากร้านค้าออนไลน์ (Shopee, Makro, Big C ...) — เลือกเฉพาะผลที่ชื่อมียี่ห้อ/ชนิดข้าวตรงกัน
- * หมายเหตุ: เป็นการอ่านหน้าเว็บค้นหา ไม่ใช่ API ทางการ ถ้า Bing เปลี่ยนหน้าเว็บอาจต้องปรับโค้ด
- */
-const BING_IMG_URL = 'https://www.bing.com/images/search';
-const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
-
-function htmlUnescape_(s) {
-  return String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-}
-
-/** ค้นรูปใน Bing → [{ title, murl (รูปต้นฉบับ), turl (รูปย่อของ Bing), purl (หน้าเว็บที่มา) }] */
-function bingImages_(query) {
-  const res = UrlFetchApp.fetch(BING_IMG_URL + '?q=' + encodeURIComponent(query) + '&form=HDRSC2&first=1&setlang=th&cc=TH', {
-    headers: { 'User-Agent': BROWSER_UA, 'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8' }, muteHttpExceptions: true, followRedirects: true,
-  });
-  const http = res.getResponseCode();
-  if (http !== 200) fail_('web_img_down', 'Bing ใช้งานไม่ได้ตอนนี้ (HTTP ' + http + ')');
-  const html = res.getContentText();
-  const out = [];
-  const re = /class="iusc"[^>]*?\sm="([^"]+)"/g;
-  let m;
-  while ((m = re.exec(html)) && out.length < 40) {
-    const d = parseJson_(htmlUnescape_(m[1]), null);
-    if (d && (d.murl || d.turl)) out.push({ title: String(d.t || '').replace(/[-]/g, ''), murl: d.murl || '', turl: d.turl || '', purl: d.purl || '' });
-  }
-  return out;
-}
-
-/** เรียงผล Bing ตามความตรงกับชื่อสินค้า — คืนเฉพาะที่ตรงพอ */
-function bingRank_(name, sizeKg, list) {
-  const want = offParseName_(name);
-  const typeCore = offNorm_(want.type.replace(/^ข้าว/, '')) || offNorm_('ข้าว');
-  const sizeRe = sizeKg ? new RegExp('(^|[^0-9.])' + String(sizeKg).replace('.', '\\.') + '\\s*(กก|กิโล|kg|k\\.g)', 'i') : null;
-  return (list || []).map(function (r) {
-    const t = offNorm_(r.title);
-    if (!t) return null;
-    if (OFF_NOT_RAW_RE.test(r.title) && !OFF_NOT_RAW_RE.test(name)) return null;     // อาหารสำเร็จรูป/ขนม
-    const brandHit = want.brands.filter(function (b) { return t.indexOf(offNorm_(b)) >= 0; }).length;
-    if (want.brands.length && !brandHit) return null;                                   // มียี่ห้อ → ยี่ห้อต้องตรง
-    const typeHit = t.indexOf(typeCore) >= 0;
-    if (!want.brands.length && !typeHit) return null;                                  // ไม่มียี่ห้อ → ชนิดข้าวต้องตรง
-    let score = brandHit * 5 + (typeHit ? 3 : 0);
-    if (sizeRe && sizeRe.test(r.title)) score += 2;
-    return { score: score, r: r };
-  }).filter(Boolean).sort(function (a, b) { return b.score - a.score; }).map(function (x) { return x.r; });
-}
-
-function saveWebImage_(zortId, blob, desc) {
-  const ext = blob.getContentType().split('/')[1].replace('jpeg', 'jpg');
-  const file = webImageFolder_().createFile(blob.copyBlob().setName('z' + zortId + '.' + ext));
-  file.setDescription(desc);
-  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { console.error(e.message); }
-  return 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w600';
-}
-
-function sizeText_(sizeKg) { return num_(sizeKg) ? ' ' + num_(sizeKg) + ' กก.' : ''; }
-
-/**
- * ค้นรูปสินค้าด้วยชื่อสินค้า แล้วดาวน์โหลดเก็บใน Drive
- * คืน { url, from: 'bing'|'off'|'', note }  (save === false = ดูผลอย่างเดียว ไม่บันทึกไฟล์)
- */
-function fetchWebImage_(z, save) {
-  const want = offParseName_(z.name);
-  const query = want.query + sizeText_(z.sizeKg);
-  const errs = [];
-
-  // 1) Bing — รูปสินค้าจริงจากร้านค้าออนไลน์
-  let ranked = [];
-  try { ranked = bingRank_(z.name, num_(z.sizeKg), bingImages_(query)); } catch (err) { errs.push(err.message); }
-  for (let i = 0; i < ranked.length && i < 4; i++) {
-    const r = ranked[i];
-    const note = 'รูปสินค้า: ' + r.title;
-    if (save === false) return { url: r.murl || r.turl, from: 'bing', note: note };
-    const blob = downloadImage_(r.murl) || downloadImage_(r.turl);
-    if (!blob) continue;
-    return { from: 'bing', note: note, url: saveWebImage_(z.zortId, blob, 'ค้นด้วย: ' + query + '\nพบ: ' + r.title + '\nจาก: ' + (r.purl || r.murl) + '\n(ค้นผ่าน Bing Images — รูปอาจมีลิขสิทธิ์ของเจ้าของสินค้า/ร้านค้า)') };
-  }
-
-  // 2) Open Food Facts — เฉพาะชื่อที่มียี่ห้อ
-  if (want.brands.length) {
-    let hit = null;
-    try { hit = offPickBest_(z.name, num_(z.sizeKg), offSearch_(want.query)); } catch (err) { errs.push(err.message); }
-    if (hit) {
-      const note = 'รูปสินค้า: ' + hit.product_name + ' ' + (hit.quantity || '');
-      if (save === false) return { url: hit.image_front_url, from: 'off', note: note };
-      const blob = downloadImage_(hit.image_front_url.replace(/\.\d+\.jpg$/, '.full.jpg')) || downloadImage_(hit.image_front_url);
-      if (blob) {
-        return { from: 'off', note: note, url: saveWebImage_(z.zortId, blob, 'ค้นด้วย: ' + want.query + '\nพบ: ' + hit.product_name + ' / ' +
-          [].concat(hit.brands || []).join(', ') + ' ' + (hit.quantity || '') + '\nจาก: Open Food Facts https://world.openfoodfacts.org/product/' + (hit.code || '') + ' (CC BY-SA)') };
-      }
-    }
-  }
-  if (errs.length && !ranked.length) fail_('web_img_down', errs.join(' / '));
-  return { url: '', from: '', note: ranked.length ? 'เจอรูปแต่ดาวน์โหลดไม่ได้' : 'ไม่พบรูปที่ชื่อตรงกับสินค้านี้' };
-}
-
-/** UrlFetchApp ไม่รับ URL ที่มีอักขระบางตัว (| " ช่องว่าง ภาษาไทย ฯลฯ) → "อาร์กิวเมนต์ไม่ถูกต้อง" จึงเข้ารหัสก่อน */
-function safeUrl_(url) {
-  return String(url).replace(/[^A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]/g, function (c) { return encodeURIComponent(c); });
-}
-
-function downloadImage_(url) {
-  if (!/^https:\/\//i.test(String(url))) return null;
-  try {
-    const r = UrlFetchApp.fetch(safeUrl_(url), { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BROWSER_UA, Accept: 'image/avif,image/webp,image/png,image/jpeg,*/*' } });
-    if (r.getResponseCode() !== 200) return null;
-    const blob = r.getBlob();
-    const type = String(blob.getContentType() || '').split(';')[0];
-    const size = blob.getBytes().length;
-    if (!/^image\/(jpeg|png|webp)$/.test(type) || size < 3000 || size > 4000000) return null;
-    return blob.setContentType(type);
-  } catch (e) { return null; }
-}
-
-function webSearchEnabled_() {
-  const s = getSettings_();
-  return s.WEB_IMAGE_SEARCH === undefined || s.WEB_IMAGE_SEARCH === '' || truthy_(s.WEB_IMAGE_SEARCH);
-}
-
-/**
- * (หลังปลดล็อก — ช้า) ค้นรูปใหม่ให้สินค้าที่ยังไม่มีรูป แล้วบันทึกทีละแถว
- * แยกออกจากช่วงล็อก เพื่อไม่ให้ลูกค้าสั่งข้าวไม่ได้ระหว่างค้นรูป
- */
-function searchMissingWebImages_(imgStat, startedAt, force) {
-  if (!webSearchEnabled_()) return;
-  const s = getSettings_();
-  const setMax = Number(s.WEB_IMAGE_MAX_PER_SYNC === undefined || s.WEB_IMAGE_MAX_PER_SYNC === '' ? 30 : s.WEB_IMAGE_MAX_PER_SYNC) || 0;
-  const max = Math.max(0, force ? Math.max(setMax, 40) : setMax);
-  const props = PropertiesService.getScriptProperties();
-  const miss = force ? {} : parseJson_(props.getProperty('WEB_IMG_MISS'), {});
+  const miss = parseJson_(props.getProperty('ZORT_IMG_MISS'), {});     // สินค้าที่ ZORT ไม่มีรูป → รอ 1 วันค่อยถามใหม่
   const now = Date.now();
-  const todo = readAll_('Products').filter(function (r) {
-    const id = String(r.zortId || '').replace(/^'/, '');
-    return id && !r.image && !(miss[id] && now - miss[id] < WEB_IMG_RETRY_DAYS * 864e5);
-  });
-  const log = [];
-  let searched = 0;
-  for (let i = 0; i < todo.length && searched < max; i++) {
-    if (Date.now() - startedAt > 240000) { imgStat.webNote = 'หมดเวลารอบนี้ กดดึงอีกครั้งเพื่อค้นที่เหลือ'; break; }  // Apps Script จำกัด 6 นาที
-    const r = todo[i];
-    const id = String(r.zortId).replace(/^'/, '');
-    const name = String(r.name || '') + (num_(r.sizeKg) ? ' ' + num_(r.sizeKg) + ' กก.' : '');
-    if (searched) Utilities.sleep(800);                                        // เว้นจังหวะ ไม่ยิงถี่ (บริการฟรี)
-    searched++;
-    let got;
-    try { got = fetchWebImage_({ zortId: id, name: String(r.name || ''), sizeKg: r.sizeKg }); } catch (err) {
-      console.error('ค้นรูปจากเว็บ: ' + err.message);
-      log.push({ name: name, ok: false, note: err.message });
-      if (/permission|สิทธิ์|DriveApp|Drive/i.test(err.message)) { imgStat.webError = 'บันทึกรูปลง Google Drive ไม่ได้: ' + err.message; break; }
-      continue;
-    }
-    log.push({ name: name, ok: !!got.url, from: got.from, note: got.note });
-    if (!got.url) { miss[id] = now; continue; }
-    delete miss[id];
-    withLock_(function () {
-      const row = findRow_('Products', 'zortId', id);
-      if (row && !row.image) updateRow_('Products', row._row, { image: got.url });
-    });
-    imgStat.none--; imgStat.web++;
+  Object.keys(miss).forEach(function (k) { if (now - miss[k] > 864e5) delete miss[k]; });
+  const todo = items.filter(function (z) { return !z.image && !miss[z.zortId]; });
+  for (let i = 0; i < todo.length; i++) {
+    if (stat.detail >= ZORT_DETAIL_IMG_MAX || Date.now() - startedAt > 150000) { stat.left = todo.length - i; break; }
+    stat.detail++;
+    try {
+      const d = zortGetProductDetail_(todo[i].zortId);
+      const url = zortImageUrl_(d && (d.imagepath || d.imageList) ? d : (d && (d.data || d.product)) || {});
+      if (url) { todo[i].image = url; stat.found++; } else miss[todo[i].zortId] = now;
+    } catch (err) { console.error('ดึงรายละเอียดสินค้า #' + todo[i].zortId + ' ไม่ได้: ' + err.message); }
   }
-  imgStat.searched = searched;
-  imgStat.waiting = Math.max(0, todo.length - searched);
-  imgStat.log = log.slice(0, 40);
-  props.setProperty('WEB_IMG_MISS', JSON.stringify(miss));
-}
-
-/** ทดสอบค้นรูป (ไม่บันทึกไฟล์) — แก้ชื่อในฟังก์ชันแล้วกด Run ดูผลใน Execution log */
-function testWebImage() {
-  ['ข้าวหอมมะลิ 100% 5 กก.', 'ข้าวหอมมะลิ ตราฉัตรทอง 5 กก.', 'ข้าวเหนียว 5 กก.', 'ข้าวไรซ์เบอร์รี่ 1 กก.', 'ข้าวขาว เสาไห้ 15 กก.'].forEach(function (name) {
-    const got = fetchWebImage_({ zortId: 'test', name: name.replace(/\s*\d+\s*กก\.$/, ''), sizeKg: Number((name.match(/(\d+)\s*กก\.$/) || [])[1]) || 0 }, false);
-    console.log((got.url ? '✅ ' : '❌ ') + name + ' → ' + got.note + (got.url ? '  ' + got.url : ''));
-  });
-}
-
-/** รันเพื่อดูลิงก์โฟลเดอร์รูปสินค้า */
-function productImageFolder() {
-  console.log('📁 โฟลเดอร์รูปสินค้า: ' + productImageFolder_().getUrl());
+  props.setProperty('ZORT_IMG_MISS', JSON.stringify(miss));
+  return stat;
 }
 
 /** ขนาดถุง (กก.) — อ่านจากชื่อสินค้าก่อน เช่น "ข้าวหอมมะลิ 5 กก." ถ้าไม่มีใช้น้ำหนักใน ZORT (กรัม) */
@@ -662,7 +351,6 @@ function zortSizeKg_(name, weightGram) {
  */
 function syncZortProducts(opts) {
   const startedAt = Date.now();
-  const force = !!(opts && opts.forceImages === true);
   const result = withLock_(function () {
     const items = zortFetchRiceProducts_();
     if (!items.length) {
@@ -681,14 +369,14 @@ function syncZortProducts(opts) {
       else removed++;
     });
 
-    let driveMap = {}, driveOk = true;
-    try { driveMap = driveImageMap_(); } catch (err) { driveOk = false; console.error('อ่านโฟลเดอร์รูปไม่ได้: ' + err.message); }
-    let webMap = {}, webOk = true;
-    try { webMap = webImageMap_(); } catch (err) { webOk = false; console.error('อ่านโฟลเดอร์รูปจากเว็บไม่ได้: ' + err.message); }
-    // ไฟล์รูปใน Drive ที่ยังอยู่ (ใช้ตรวจว่ารูปเดิมของสินค้ายังใช้ได้ — ถ้าถูกลบ จะหารูปใหม่)
-    const liveIds = {};
-    [driveMap, webMap].forEach(function (m) { Object.keys(m).forEach(function (k) { const id = driveFileId_(m[k]); if (id) liveIds[id] = true; }); });
-    const imgStat = { drive: 0, kept: 0, zort: 0, web: 0, none: 0 };
+    // รูปสินค้า: ใช้รูปจาก ZORT อย่างเดียว (ไม่ค้นรูปตามชื่อสินค้าจากที่อื่น)
+    //   ไม่มีรูปในรายการ แต่รอบก่อนเคยได้รูปจากรายละเอียดสินค้าใน ZORT → ใช้รูปนั้นต่อ (รูปเก่าจาก Drive/เว็บ ไม่ใช้แล้ว)
+    items.forEach(function (z) {
+      const prev = keep[z.zortId] && String(keep[z.zortId].image || '').trim();
+      if (!z.image && prev && /^https:\/\//i.test(prev) && !/googleusercontent\.com/i.test(prev)) z.image = prev;
+    });
+    const detailStat = fillZortImages_(items, startedAt);
+    const imgStat = { zort: 0, none: 0, detail: detailStat.detail, detailFound: detailStat.found, detailLeft: detailStat.left };
 
     const now = new Date();
     let nextSort = Object.keys(keep).reduce(function (m, k) { return Math.max(m, num_(keep[k].sort)); }, 0) + 1;
@@ -696,11 +384,10 @@ function syncZortProducts(opts) {
     const objs = items.map(function (z) {
       const old = keep[z.zortId];
       if (!old) added++;
-      const img = pickImage_(z, old, driveMap, webMap, liveIds, driveOk && webOk);
-      imgStat[img.from]++;
+      imgStat[z.image ? 'zort' : 'none']++;
       return {
         id: 'z' + z.zortId, name: z.name, detail: z.detail, category: z.category, sizeKg: z.sizeKg, unit: z.unit,
-        price: z.price, priceWholesale: old ? old.priceWholesale : '', image: img.url, active: z.active,
+        price: z.price, priceWholesale: old ? old.priceWholesale : '', image: z.image, active: z.active,
         sort: old && num_(old.sort) ? num_(old.sort) : nextSort++,
         sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now,
       };
@@ -720,17 +407,12 @@ function syncZortProducts(opts) {
       fetched: items.length, updated: items.length - added, added: added,
       removed: removed + gone, inactive: items.inactive || 0, at: now.toISOString(),
       images: imgStat,
+      diag: items.diag,
+      outOfStock: objs.filter(function (o) { return o.stock !== null && o.stock !== undefined && o.stock <= 0; }).map(function (o) { return o.name + (o.sizeKg ? ' ' + o.sizeKg + ' กก.' : ''); }),
     };
     return result;
   });
-  // ค้นรูปจากเว็บหลังปลดล็อก (ลูกค้ายังสั่งข้าวได้ระหว่างนี้)
-  try { searchMissingWebImages_(result.images, startedAt, force); } catch (err) {
-    console.error('ค้นรูปจากเว็บล้มเหลว: ' + err.message);
-    result.images.webError = err.message;
-  }
-  result.images.webSearch = webSearchEnabled_();
-  clearCache();
-  const saved = Object.assign({}, result, { images: Object.assign({}, result.images, { log: undefined }) });
+  const saved = Object.assign({}, result, { diag: undefined, outOfStock: (result.outOfStock || []).length });
   PropertiesService.getScriptProperties().setProperty('ZORT_LAST_SYNC', JSON.stringify(saved));
   console.log('ZORT sync: ' + JSON.stringify(result));
   return result;
@@ -885,12 +567,10 @@ function previewZortOrder() {
 }
 
 function zortStatus_() {
-  const folderId = prop_('PRODUCT_IMG_FOLDER_ID');
   return {
     configured: zortConfigured_(),
     pushOrders: zortPushEnabled_(),
     lastSync: parseJson_(prop_('ZORT_LAST_SYNC'), null),
-    imageFolderUrl: folderId ? 'https://drive.google.com/drive/folders/' + folderId : '',
   };
 }
 
@@ -939,6 +619,18 @@ function zortPreview() {
   console.log('จะดึงสินค้า ' + items.length + ' รายการ');
   items.forEach(function (p) {
     console.log('#' + p.zortId + ' | ' + p.sku + ' | ' + p.name + ' | ' + p.sizeKg + ' กก. | ฿' + p.price + ' | สต็อก ' + p.stock + ' ' + p.unit +
-      ' | รูป: ' + (p.image ? 'มีใน ZORT' : 'ไม่มี — วางไฟล์ชื่อ "' + (p.sku || p.name) + '.jpg" ในโฟลเดอร์รูปสินค้า'));
+      ' | รูป: ' + (p.image ? 'มีใน ZORT' : 'ไม่มี — ใส่รูปที่สินค้าใน ZORT'));
+  });
+}
+
+/** ตรวจว่าสินค้าในคลัง ZORT มาครบไหม — ดูผลใน Execution log (ไม่เขียนชีต) */
+function zortCheck() {
+  const items = zortFetchRiceProducts_();
+  const d = items.diag;
+  console.log('ตัวกรอง: ' + d.filter + ' | คลัง: ' + d.warehouse + ' | ZORT บอกว่ามี ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า)');
+  console.log('ได้จาก ZORT ' + d.raw + ' → ไม่ตรงคำค้น ' + d.notMatched + ' · บริการ ' + d.service + ' · ปิดใช้งาน ' + d.inactive + ' · ซ้ำ ' + d.dup + ' → ดึงเข้า ' + d.kept);
+  d.skipped.forEach(function (x) { console.log('ข้าม: ' + x.name + ' — ' + x.why); });
+  items.filter(function (p) { return p.stock !== null && p.stock <= 0; }).forEach(function (p) {
+    console.log('สต็อกหมด (ไม่แสดงหน้าลูกค้า): ' + p.name + ' ' + p.sizeKg + ' กก.');
   });
 }
