@@ -864,7 +864,6 @@
       bar = '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="reorder" data-id="' + esc(o.orderId) + '">' + icon('repeat') + ' สั่งแบบนี้อีกครั้ง</button>';
     }
 
-    const canCancel = ['new', 'quoted', 'confirmed'].indexOf(o.status) >= 0;
     return {
       back: '#/orders', top: 'ใบสั่งสินค้า #' + o.orderId,
       body:
@@ -874,7 +873,6 @@
         billHtml(o, st) + action +
         '<div class="stack section">' +
         (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' ติดต่อร้าน</a>' : '') +
-        (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกคำสั่งซื้อ</button>' : '') +
         '</div>',
       bar: bar,
     };
@@ -995,17 +993,6 @@
       R.toast('ส่งรูปสลิปแล้ว ร้านกำลังตรวจสอบ', 'ok');
       render();
       window.scrollTo(0, 0);
-    } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
-  }
-
-  async function cancelOrder(id) {
-    const ok = await R.confirmBox('ยกเลิกคำสั่งซื้อนี้ใช่ไหมคะ', 'ถ้ายกเลิกแล้ว ต้องสั่งใหม่อีกครั้ง', 'ใช่ ยกเลิก', 'ไม่ยกเลิก', 'danger');
-    if (!ok) return;
-    R.busy(true, 'กำลังยกเลิก...');
-    try {
-      upsertOrder(await R.api('cancelOrder', { orderId: id }));
-      R.toast('ยกเลิกคำสั่งซื้อแล้ว', 'ok');
-      render();
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }
 
@@ -1190,7 +1177,6 @@
       case 'close': R.closeWindow(); break;
       case 'pay': payChoice[route().arg] = id; render(); break;
       case 'confirm': confirmOrder(id); break;
-      case 'cancel': cancelOrder(id); break;
       case 'reorder': reorder(id); break;
       case 'pf-purpose':
         pf.purpose = id;

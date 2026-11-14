@@ -95,7 +95,7 @@ function route_(req) {
     case 'getOrder': return orderView_(ownOrder_(user, req.orderId));
     case 'confirmOrder': return withLock_(function () { return apiConfirmOrder_(user, req.orderId, req.payMethod); });
     case 'uploadSlip': return apiUploadSlip_(user, req);
-    case 'cancelOrder': return withLock_(function () { return apiCancelOrder_(user, req.orderId); });
+    case 'cancelOrder': return fail_('forbidden', 'ยกเลิกคำสั่งซื้อได้เฉพาะร้าน กรุณากด "ติดต่อร้าน"');
     case 'adminClaim': return withLock_(function () { return apiAdminClaim_(user, req.code); });
   }
 
@@ -365,15 +365,6 @@ function apiUploadSlip_(user, req) {
     try { notifyAdmins_([flexAdminEvent_(view, getSettings_(), 'ลูกค้าส่งสลิปโอนเงินแล้ว', 'ยอด ฿' + money_(view.total) + ' — กรุณาตรวจสอบ')]); } catch (err) { console.error(err); }
     return view;
   });
-}
-
-function apiCancelOrder_(user, orderId) {
-  const o = ownOrder_(user, orderId);
-  if (['new', 'quoted', 'confirmed'].indexOf(o.status) < 0) fail_('bad_status', 'ยกเลิกเองไม่ได้แล้ว กรุณาโทรหาร้าน');
-  const upd = updateOrder_(o, { status: 'cancelled', cancelReason: 'ลูกค้ายกเลิกเอง' }, 'customer', 'ลูกค้ายกเลิกเอง');
-  const view = orderView_(upd);
-  try { notifyAdmins_([flexAdminEvent_(view, getSettings_(), 'ลูกค้ายกเลิกคำสั่งซื้อ', view.itemsText || '')]); } catch (err) { console.error(err); }
-  return view;
 }
 
 function nextOrderId_() {
