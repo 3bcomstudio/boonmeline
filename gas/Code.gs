@@ -55,6 +55,7 @@ const ADMIN_TRANSITIONS = {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (p.action === 'ping') return json_({ ok: true, version: APP_VERSION });
+  if (p.action === 'lineStatus') return json_({ ok: true, data: lineStatus_() });
   return ContentService.createTextOutput('Rice Order API ' + APP_VERSION + ' พร้อมใช้งาน');
 }
 

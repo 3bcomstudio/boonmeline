@@ -278,9 +278,10 @@ function handleWebhook_(body) {
     try {
       const uid = ev.source && ev.source.userId;
       if (ev.type === 'follow') {
-        reply_(ev.replyToken, [flexWelcome_(getSettings_())]);
+        logWebhook_(ev.type, reply_(ev.replyToken, [flexWelcome_(getSettings_())]));
         return;
       }
+      logWebhook_(ev.type + (ev.message ? ':' + ev.message.type : ''), null);
       if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text') return;
       const text = String(ev.message.text || '').trim();
       const s = getSettings_();
@@ -305,6 +306,33 @@ function handleWebhook_(body) {
       // ข้อความอื่น ๆ ปล่อยให้แอดมินตอบเองใน LINE OA Manager
     } catch (err) {
       console.error('event', err && err.stack || err);
+      logWebhook_(ev && ev.type, { ok: false, error: String(err && err.message || err) });
     }
   });
+}
+
+/** เก็บ 10 เหตุการณ์ webhook ล่าสุด (ชนิด เวลา ผลการตอบกลับ — ไม่เก็บข้อมูลลูกค้า) ไว้ตรวจปัญหา */
+function logWebhook_(type, result) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const log = parseJson_(props.getProperty('WEBHOOK_LOG'), []);
+    log.unshift({ at: new Date().toISOString(), type: type, ok: result ? !!result.ok : null, error: result && result.error ? String(result.error).slice(0, 200) : '' });
+    props.setProperty('WEBHOOK_LOG', JSON.stringify(log.slice(0, 10)));
+  } catch (e) { /* ไม่ให้การบันทึกทำให้ตอบลูกค้าไม่ได้ */ }
+}
+
+/** ตรวจการเชื่อม LINE: token เป็นของ OA ไหน, webhook URL ที่ตั้งไว้, เหตุการณ์ล่าสุด (ไม่มีความลับ) */
+function lineStatus_() {
+  const token = prop_('LINE_CHANNEL_ACCESS_TOKEN');
+  const out = { tokenSet: !!token, webhookLog: parseJson_(prop_('WEBHOOK_LOG'), []), myUrl: ScriptApp.getService().getUrl() };
+  if (!token) return out;
+  const get = function (url) {
+    const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+    return { code: r.getResponseCode(), body: parseJson_(r.getContentText(), {}) };
+  };
+  const info = get('https://api.line.me/v2/bot/info');
+  out.bot = info.code === 200 ? { name: info.body.displayName, basicId: info.body.basicId, chatMode: info.body.chatMode } : { error: 'HTTP ' + info.code + ' ' + (info.body.message || '') };
+  const wh = get('https://api.line.me/v2/bot/channel/webhook/endpoint');
+  out.webhook = wh.code === 200 ? { url: wh.body.endpoint, active: wh.body.active } : { error: 'HTTP ' + wh.code + ' ' + (wh.body.message || '') };
+  return out;
 }
