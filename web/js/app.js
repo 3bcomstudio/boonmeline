@@ -746,8 +746,8 @@
         '<ul class="bill-items">' + items + '</ul>' +
         '<p style="text-align:right;margin-top:.3rem"><a class="edit" href="#/shop">แก้ไขรายการข้าว</a></p>' +
         '<dl class="bill-info">' +
-        infoRow('ประเภทการใช้งาน', esc(p.label) + (cart.purposeNote ? ' (' + esc(cart.purposeNote) + ')' : ''), '#/purpose') +
-        infoRow('ประเภทการจัดส่ง', esc(where) + (cart.lat && cart.deliveryMethod === 'delivery' ? ' (มีจุดบนแผนที่)' : ''), '#/delivery') +
+        infoRow('การใช้งาน', esc(p.label) + (cart.purposeNote ? ' (' + esc(cart.purposeNote) + ')' : ''), '#/purpose') +
+        infoRow('การจัดส่ง', esc(where) + (cart.lat && cart.deliveryMethod === 'delivery' ? ' (มีจุดบนแผนที่)' : ''), '#/delivery') +
         infoRow('วันที่ต้องการ', esc(wantText()), '#/delivery') +
         infoRow('ผู้สั่ง', esc(c.fullName) + '<br>' + esc(R.phoneFmt(c.phone)), '#/profile') +
         '</dl>' +
@@ -873,7 +873,7 @@
         '<div class="status-box tone-' + st.tone + '">' + icon(st.icon) + '<strong>' + esc(st.label) + '</strong><span>' + esc(st.next) + '</span></div>' +
         billHtml(o, st) + action +
         '<div class="stack section">' +
-        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' ติดต่อ</a>' : '') +
+        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' ติดต่อร้าน</a>' : '') +
         (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกคำสั่งซื้อ</button>' : '') +
         '</div>',
       bar: bar,
@@ -907,8 +907,8 @@
       '<span class="stamp tone-' + st.tone + '">' + esc(st.label) + '</span></div>' +
       '<ul class="bill-items">' + items + '</ul>' + totals +
       '<dl class="bill-info">' +
-      infoRow('ประเภทการใช้งาน', esc(R.purposeOf(o.purpose).label) + (o.purposeNote ? ' (' + esc(o.purposeNote) + ')' : '')) +
-      infoRow('ประเภทการจัดส่ง', esc(where)) +
+      infoRow('การใช้งาน', esc(R.purposeOf(o.purpose).label) + (o.purposeNote ? ' (' + esc(o.purposeNote) + ')' : '')) +
+      infoRow('การจัดส่ง', esc(where)) +
       (o.wantDate ? infoRow('วันที่ต้องการ', esc(o.wantDate)) : '') +
       (o.payMethod ? infoRow('จ่ายเงิน', o.payMethod === 'cod' ? 'เงินสด' : 'โอน / สแกนจ่าย') : '') +
       (o.note ? infoRow('ข้อความถึงร้าน', esc(o.note)) : '') +
