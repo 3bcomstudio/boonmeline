@@ -495,8 +495,8 @@
       groups.map(prodCard).join('');
   }
 
-  /* ---------- ข้าวชื่อเดียวกัน หลายขนาด/หน่วย → การ์ดเดียว เลือกขนาดได้ ---------- */
-  const gkey = (p) => String(p.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  /* ---------- แสดงทีละรายการตามที่ดึงจาก ZORT (ไม่รวมกลุ่มตามชื่อ) ---------- */
+  const gkey = (p) => String(p.id);
   const variantLabel = (p) => (Number(p.sizeKg) ? p.sizeKg + ' กก.' : '') + (p.unit ? (Number(p.sizeKg) ? ' / ' : '') + p.unit : '');
   const VSEL = {}; // ขนาดที่เลือกไว้ของแต่ละชื่อ
   const OPEN = new Set(); // สินค้าที่ลูกค้ากด "เลือกสินค้านี้" แล้ว (จึงแสดงปุ่มขนาด/จำนวน)
@@ -741,7 +741,7 @@
       back: '#/delivery', top: 'สั่งซื้อข้าวสาร',
       body: stepHead(4, 'กรุณาตรวจสอบข้อมูลการสั่งซื้อ', 'หากข้อมูลถูกต้อง กรุณากดปุ่มสีเขียวด้านล่าง') +
         '<div class="bill">' +
-        '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">ใบสั่งข้าว</div>' +
+        '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">ใบสั่งสินค้า</div>' +
         '<div class="bill-meta">วันที่ ' + R.dateTH(new Date().toISOString()) + '</div></div>' +
         '<ul class="bill-items">' + items + '</ul>' +
         '<p style="text-align:right;margin-top:.3rem"><a class="edit" href="#/shop">แก้ไขรายการข้าว</a></p>' +
@@ -755,7 +755,7 @@
         '</div>' +
         '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่จำเป็นต้องระบุ)</span>' +
         '<textarea class="textarea" data-bind="note" rows="2" maxlength="500" placeholder="เช่น ส่งช่วงเช้า หรือ โทรก่อนมาส่ง">' + esc(cart.note) + '</textarea></label>',
-      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งซื้อให้ร้าน</button>',
+      bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งสินค้าให้ร้าน</button>',
     };
   };
 
@@ -776,7 +776,7 @@
       deliveryMethod: cart.deliveryMethod, address: cart.address, lat: cart.lat, lng: cart.lng,
       wantDate: wantText(), note: cart.note,
     };
-    R.busy(true, 'กำลังส่งใบสั่งข้าว...');
+    R.busy(true, 'กำลังส่งใบสั่งสินค้า...');
     try {
       const o = await R.api('createOrder', { order: payload });
       S.orders.unshift(o);
@@ -797,13 +797,13 @@
     return {
       top: shopName(),
       body: '<div class="done-hero"><div class="big-check">' + icon('check') + '</div>' +
-        '<h1 class="page-title">ส่งใบสั่งซื้อให้ร้านแล้ว</h1>' +
+        '<h1 class="page-title">ส่งใบสั่งสินค้าให้ร้านแล้ว</h1>' +
         '<div class="order-no">เลขที่ ' + esc(id) + '</div>' +
         '<p>ร้านกำลังคิดราคา แล้วจะส่งราคามาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
         '<p style="margin-top:.5rem">ตอนนี้ไม่ต้องทำอะไรเพิ่ม รอข้อความจากร้านได้เลย</p></div>' +
         '<div class="stack">' +
         (R.inLineApp() ? '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="close">' + icon('chat') + ' กลับไปที่แชท LINE</button>' : '') +
-        '<button type="button" class="btn btn-ghost btn-lg btn-block" data-act="go" data-to="#/order/' + esc(id) + '">ดูใบสั่งข้าวนี้</button>' +
+        '<button type="button" class="btn btn-ghost btn-lg btn-block" data-act="go" data-to="#/order/' + esc(id) + '">ดูใบสั่งสินค้านี้</button>' +
         '<button type="button" class="btn btn-quiet btn-block" data-act="go" data-to="#/">กลับหน้าแรก</button></div>',
     };
   };
@@ -838,7 +838,7 @@
     const o = S.orders.find((x) => x.orderId === id);
     if (!o) {
       loadOrder(id);
-      return { back: '#/orders', top: 'ใบสั่งข้าว', body: '<div class="splash" style="min-height:40vh"><div>' + R.sackLoader('5.5rem') + '<p class="loading-text">กำลังเปิดใบสั่งข้าว...</p></div></div>' };
+      return { back: '#/orders', top: 'ใบสั่งสินค้า', body: '<div class="splash" style="min-height:40vh"><div>' + R.sackLoader('5.5rem') + '<p class="loading-text">กำลังเปิดใบสั่งสินค้า...</p></div></div>' };
     }
     const st = R.statusInfo(o);
     const s = S.settings;
@@ -866,9 +866,9 @@
 
     const canCancel = ['new', 'quoted', 'confirmed'].indexOf(o.status) >= 0;
     return {
-      back: '#/orders', top: 'ใบสั่งข้าว #' + o.orderId,
+      back: '#/orders', top: 'ใบสั่งสินค้า #' + o.orderId,
       body:
-        '<h1 class="page-title">ใบสั่งข้าว #' + esc(o.orderId) + '</h1>' +
+        '<h1 class="page-title">ใบสั่งสินค้า #' + esc(o.orderId) + '</h1>' +
         '<p class="page-lead" style="margin-bottom:.9rem">สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + '</p>' +
         '<div class="status-box tone-' + st.tone + '">' + icon(st.icon) + '<strong>' + esc(st.label) + '</strong><span>' + esc(st.next) + '</span></div>' +
         billHtml(o, st) + action +
@@ -903,7 +903,7 @@
       if (o.status === 'new') totals = '<p class="bill-wait">ร้านกำลังคิดราคา จะส่งมาทาง LINE</p>';
     }
     return '<div class="bill">' +
-      '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">' + (q ? 'ใบแจ้งราคา' : 'ใบสั่งข้าว') + '</div>' +
+      '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">' + (q ? 'ใบแจ้งราคา' : 'ใบสั่งสินค้า') + '</div>' +
       '<div class="bill-meta">เลขที่ ' + esc(o.orderId) + '</div>' +
       '<span class="stamp tone-' + st.tone + '">' + esc(st.label) + '</span></div>' +
       '<ul class="bill-items">' + items + '</ul>' + totals +

@@ -395,7 +395,7 @@ html[data-size="xl"] { font-size: 23px; }
 .loc-ok { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; color: var(--green); font-weight: 700; }
 .loc-ok a { font-weight: 600; }
 
-/* ---------- ใบสั่งข้าว / ใบแจ้งราคา (บิลกระดาษร้านข้าว) ---------- */
+/* ---------- ใบสั่งสินค้า / ใบแจ้งราคา (บิลกระดาษร้านข้าว) ---------- */
 .bill {
   position: relative; background: var(--surface);
   padding: 1.6rem 1.15rem 1.5rem; margin: .4rem 0 1rem;

@@ -170,7 +170,7 @@ function flexQuote_(o, s) {
 
   return flex_('ร้านแจ้งราคา #' + o.orderId + ' ยอด ฿' + money_(q.total) + ' — กดเพื่อยืนยัน', bubble_({
     title: 'ร้านแจ้งราคาแล้ว',
-    subtitle: 'ใบสั่งข้าว เลขที่ ' + o.orderId,
+    subtitle: 'ใบสั่งสินค้า เลขที่ ' + o.orderId,
     body: body,
     buttons: [
       btn_('ดูราคาและยืนยัน', liffUrl_(o.orderId), 'primary', C.green),
@@ -184,27 +184,27 @@ function statusCopy_(o, s, from) {
   const pickup = o.deliveryMethod === 'pickup';
   switch (o.status) {
     case 'new':
-      return { title: 'ร้านได้รับใบสั่งข้าวแล้ว', text: 'ร้านกำลังคิดราคา แล้วจะส่งราคามาในแชทนี้' + (s.QUOTE_TIME ? ' (' + s.QUOTE_TIME + ')' : ''), bg: C.brand, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ร้านได้รับใบสั่งสินค้าแล้ว', text: 'ร้านกำลังคิดราคา แล้วจะส่งราคามาในแชทนี้' + (s.QUOTE_TIME ? ' (' + s.QUOTE_TIME + ')' : ''), bg: C.brand, btn: 'ดูใบสั่งสินค้า' };
     case 'quoted':
       return { title: 'ร้านแจ้งราคาแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดูราคาและยืนยัน', bg: C.brand, btn: 'ดูราคาและยืนยัน' };
     case 'confirmed':
       if (from === 'slip') return { title: 'ขอรูปสลิปใหม่อีกครั้ง', text: 'ร้านตรวจสลิปแล้วยังไม่ตรงกับยอดเงิน กรุณาส่งรูปสลิปใหม่', bg: C.red, btn: 'ส่งสลิปใหม่' };
-      if (o.payMethod === 'cod') return { title: 'ยืนยันสั่งข้าวแล้ว', text: 'เตรียมเงินสด ' + total + (pickup ? ' ไว้จ่ายตอนมารับข้าวที่ร้าน' : ' ไว้จ่ายตอนรับข้าว'), bg: C.brand, btn: 'ดูใบสั่งข้าว' };
+      if (o.payMethod === 'cod') return { title: 'ยืนยันสั่งข้าวแล้ว', text: 'เตรียมเงินสด ' + total + (pickup ? ' ไว้จ่ายตอนมารับข้าวที่ร้าน' : ' ไว้จ่ายตอนรับข้าว'), bg: C.brand, btn: 'ดูใบสั่งสินค้า' };
       return { title: 'ยืนยันสั่งข้าวแล้ว', text: 'ยอดที่ต้องจ่าย ' + total + ' กดปุ่มเพื่อดู QR พร้อมเพย์และส่งรูปสลิป', bg: C.brand, btn: 'จ่ายเงินและส่งสลิป' };
     case 'slip':
-      return { title: 'ร้านได้รับสลิปแล้ว', text: 'ร้านกำลังตรวจสอบยอดเงิน แล้วจะแจ้งให้ทราบในแชทนี้', bg: C.brand, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ร้านได้รับสลิปแล้ว', text: 'ร้านกำลังตรวจสอบยอดเงิน แล้วจะแจ้งให้ทราบในแชทนี้', bg: C.brand, btn: 'ดูใบสั่งสินค้า' };
     case 'paid':
-      return { title: 'ได้รับเงินแล้ว ขอบคุณที่อุดหนุน', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ได้รับเงินแล้ว ขอบคุณที่อุดหนุน', text: 'ร้านกำลังเตรียมข้าวของคุณ', bg: C.green, btn: 'ดูใบสั่งสินค้า' };
     case 'shipping':
       return pickup
-        ? { title: 'ข้าวพร้อมแล้ว มารับได้เลย', text: 'มารับที่ร้าน' + (s.SHOP_ADDRESS ? ': ' + s.SHOP_ADDRESS : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' }
-        : { title: 'ข้าวกำลังไปส่ง', text: 'ร้านกำลังนำข้าวไปส่ง' + (o.payMethod === 'cod' ? ' เตรียมเงินสด ' + total + ' ไว้ด้วยนะคะ' : ''), bg: C.green, btn: 'ดูใบสั่งข้าว' };
+        ? { title: 'ข้าวพร้อมแล้ว มารับได้เลย', text: 'มารับที่ร้าน' + (s.SHOP_ADDRESS ? ': ' + s.SHOP_ADDRESS : ''), bg: C.green, btn: 'ดูใบสั่งสินค้า' }
+        : { title: 'ข้าวกำลังไปส่ง', text: 'ร้านกำลังนำข้าวไปส่ง' + (o.payMethod === 'cod' ? ' เตรียมเงินสด ' + total + ' ไว้ด้วยนะคะ' : ''), bg: C.green, btn: 'ดูใบสั่งสินค้า' };
     case 'done':
       return { title: 'ได้รับข้าวเรียบร้อย', text: 'ขอบคุณที่อุดหนุน' + shopName_(s), bg: C.green, btn: 'สั่งข้าวอีกครั้ง', home: true };
     case 'cancelled':
-      return { title: 'ยกเลิกการสั่งข้าวแล้ว', text: o.cancelReason || 'ยกเลิกแล้ว', bg: C.red, btn: 'ดูใบสั่งข้าว' };
+      return { title: 'ยกเลิกการสั่งข้าวแล้ว', text: o.cancelReason || 'ยกเลิกแล้ว', bg: C.red, btn: 'ดูใบสั่งสินค้า' };
   }
-  return { title: STATUS_LABEL[o.status] || o.status, text: '', bg: C.brand, btn: 'ดูใบสั่งข้าว' };
+  return { title: STATUS_LABEL[o.status] || o.status, text: '', bg: C.brand, btn: 'ดูใบสั่งสินค้า' };
 }
 
 /** ข้อความแจ้งสถานะให้ลูกค้า — opts: {from, note} */
@@ -216,7 +216,7 @@ function flexStatus_(o, s, opts) {
   if (o.itemsText) body.push(t_(o.itemsText, { size: 'sm', color: C.ink3, margin: 'lg' }));
   return flex_(c.title + ' #' + o.orderId + ' — ' + c.text, bubble_({
     title: c.title,
-    subtitle: 'ใบสั่งข้าว เลขที่ ' + o.orderId,
+    subtitle: 'ใบสั่งสินค้า เลขที่ ' + o.orderId,
     headerBg: c.bg,
     body: body,
     buttons: [btn_(c.btn, liffUrl_(c.home ? '' : o.orderId), 'primary', C.brand)],
