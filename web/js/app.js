@@ -739,7 +739,7 @@
       : 'ส่งถึงที่: ' + (cart.address || 'ตามตำแหน่งบนแผนที่');
     return {
       back: '#/delivery', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(4, 'ตรวจสอบก่อนส่ง', 'หากข้อมูลถูกต้อง กรุณากดปุ่มสีเขียวด้านล่าง') +
+      body: stepHead(4, 'กรุณาตรวจสอบข้อมูลการสั่งซื้อ', 'หากข้อมูลถูกต้อง กรุณากดปุ่มสีเขียวด้านล่าง') +
         '<div class="bill">' +
         '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">ใบสั่งข้าว</div>' +
         '<div class="bill-meta">วันที่ ' + R.dateTH(new Date().toISOString()) + '</div></div>' +
@@ -1160,7 +1160,7 @@
       case 'purpose-next': {
         const p = R.purposeOf(cart.purpose);
         if (p.noteRequired && !String(cart.purposeNote || '').trim()) {
-          R.toast('กรุณาบอกร้านว่าซื้อข้าวไปใช้ทำอะไร', 'err');
+          R.toast('กรุณาระบุข้อมูลเพิ่มเติม (อื่น ๆ)', 'err');
           const inp = document.querySelector('[data-bind="purposeNote"]'); if (inp) inp.focus();
           return;
         }

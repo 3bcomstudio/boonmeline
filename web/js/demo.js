@@ -116,7 +116,7 @@
       const c = db.customers[ME.userId];
       if (!c) err('need_profile', 'กรุณากรอกชื่อและเบอร์โทรก่อนสั่งซื้อ');
       if (!PURPOSE_LABEL[o.purpose]) err('invalid', 'กรุณาเลือกว่าซื้อข้าวไปใช้ทำอะไร');
-      if (o.purpose === 'other' && !String(o.purposeNote || '').trim()) err('invalid', 'กรุณาบอกร้านว่าซื้อข้าวไปใช้ทำอะไร');
+      if (o.purpose === 'other' && !String(o.purposeNote || '').trim()) err('invalid', 'กรุณาระบุข้อมูลเพิ่มเติม (อื่น ๆ)');
       const ws = o.purpose === 'restaurant' || o.purpose === 'wholesale';
       const items = (o.items || []).map((it) => {
         const p = PRODUCTS.find((x) => x.id === it.productId);

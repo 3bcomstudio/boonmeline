@@ -14,7 +14,7 @@
     { id: 'donate', label: 'สำหรับถวายพระ/ทำบุญ', icon: 'donate', notePrompt: 'ทำบุญที่ไหน หรือให้ใคร (ไม่จำเป็นต้องระบุ)' },
     { id: 'restaurant', label: 'ร้านอาหาร', icon: 'restaurant', notePrompt: 'ชื่อร้านอาหาร (ไม่จำเป็นต้องระบุ)' },
     { id: 'wholesale', label: 'ขายส่ง/ขายต่อ', icon: 'wholesale', notePrompt: 'ชื่อร้าน หรือกิจการ (ไม่จำเป็นต้องระบุ)' },
-    { id: 'other', label: 'อื่น ๆ', icon: 'other', notePrompt: 'ซื้อข้าวไปใช้ทำอะไร', noteRequired: true },
+    { id: 'other', label: 'อื่น ๆ', icon: 'other', notePrompt: 'กรุณาระบุ', noteRequired: true },
   ];
   const purposeOf = (id) => PURPOSES.find((p) => p.id === id) || PURPOSES[0];
 

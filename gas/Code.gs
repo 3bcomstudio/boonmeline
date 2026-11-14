@@ -260,7 +260,7 @@ function apiCreateOrder_(user, o) {
 
   const purpose = PURPOSES[o.purpose] ? o.purpose : fail_('invalid', 'กรุณาเลือกว่าซื้อข้าวไปใช้ทำอะไร');
   const purposeNote = clean_(o.purposeNote, 200);
-  if (purpose === 'other' && !purposeNote) fail_('invalid', 'กรุณาบอกร้านว่าซื้อข้าวไปใช้ทำอะไร');
+  if (purpose === 'other' && !purposeNote) fail_('invalid', 'กรุณาระบุข้อมูลเพิ่มเติม (อื่น ๆ)');
 
   const byId = {};
   getProducts_(true).forEach(function (p) { byId[p.id] = p; });
