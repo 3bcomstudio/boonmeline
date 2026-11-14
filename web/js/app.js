@@ -746,8 +746,8 @@
         '<ul class="bill-items">' + items + '</ul>' +
         '<p style="text-align:right;margin-top:.3rem"><a class="edit" href="#/shop">แก้ไขรายการข้าว</a></p>' +
         '<dl class="bill-info">' +
-        infoRow('ซื้อไป', esc(p.label) + (cart.purposeNote ? ' (' + esc(cart.purposeNote) + ')' : ''), '#/purpose') +
-        infoRow('รับข้าว', esc(where) + (cart.lat && cart.deliveryMethod === 'delivery' ? ' (มีจุดบนแผนที่)' : ''), '#/delivery') +
+        infoRow('ประเภทการใช้งาน', esc(p.label) + (cart.purposeNote ? ' (' + esc(cart.purposeNote) + ')' : ''), '#/purpose') +
+        infoRow('ประเภทการจัดส่ง', esc(where) + (cart.lat && cart.deliveryMethod === 'delivery' ? ' (มีจุดบนแผนที่)' : ''), '#/delivery') +
         infoRow('วันที่ต้องการ', esc(wantText()), '#/delivery') +
         infoRow('ผู้สั่ง', esc(c.fullName) + '<br>' + esc(R.phoneFmt(c.phone)), '#/profile') +
         '</dl>' +
@@ -872,10 +872,9 @@
         '<p class="page-lead" style="margin-bottom:.9rem">สั่งเมื่อ ' + R.dateTH(o.createdAt, true) + '</p>' +
         '<div class="status-box tone-' + st.tone + '">' + icon(st.icon) + '<strong>' + esc(st.label) + '</strong><span>' + esc(st.next) + '</span></div>' +
         billHtml(o, st) + action +
-        (o.status !== 'cancelled' ? '<section class="section"><h2 class="section-title">ขั้นตอน</h2>' + timeline(o) + '</section>' : '') +
         '<div class="stack section">' +
-        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' โทรถามร้าน ' + esc(mainPhone()) + '</a>' : '') +
-        (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกการสั่งข้าวนี้</button>' : '') +
+        (s.SHOP_PHONE ? '<a class="btn btn-ghost btn-block" href="' + telLink() + '">' + icon('phone') + ' ติดต่อ</a>' : '') +
+        (canCancel ? '<button type="button" class="btn btn-danger btn-block" data-act="cancel" data-id="' + esc(o.orderId) + '">ยกเลิกคำสั่งซื้อ</button>' : '') +
         '</div>',
       bar: bar,
     };
@@ -900,7 +899,7 @@
       items = (o.items || []).map((i) =>
         '<li><span class="bi-name">' + esc(i.name) + '</span><span class="bi-sub">' + esc(i.detail || '') + ' (' + esc(i.unit) + 'ละ ' + i.sizeKg + ' กก.)</span>' +
         '<span class="bi-amt">' + i.qty + ' ' + esc(i.unit) + '</span></li>').join('');
-      if (o.status === 'new') totals = '<p class="bill-wait">ร้านกำลังคิดราคา จะส่งมาทาง LINE</p>';
+      if (o.status === 'new') totals = '<p class="bill-wait">ร้านกำลังสรุปยอด และจะแจ้งทาง LINE</p>';
     }
     return '<div class="bill">' +
       '<div class="bill-head"><div class="bill-shop">' + esc(shopName()) + '</div><div class="bill-title">' + (q ? 'ใบแจ้งราคา' : 'ใบสั่งสินค้า') + '</div>' +
@@ -908,30 +907,12 @@
       '<span class="stamp tone-' + st.tone + '">' + esc(st.label) + '</span></div>' +
       '<ul class="bill-items">' + items + '</ul>' + totals +
       '<dl class="bill-info">' +
-      infoRow('ซื้อไป', esc(R.purposeOf(o.purpose).label) + (o.purposeNote ? ' (' + esc(o.purposeNote) + ')' : '')) +
-      infoRow('รับข้าว', esc(where)) +
+      infoRow('ประเภทการใช้งาน', esc(R.purposeOf(o.purpose).label) + (o.purposeNote ? ' (' + esc(o.purposeNote) + ')' : '')) +
+      infoRow('ประเภทการจัดส่ง', esc(where)) +
       (o.wantDate ? infoRow('วันที่ต้องการ', esc(o.wantDate)) : '') +
       (o.payMethod ? infoRow('จ่ายเงิน', o.payMethod === 'cod' ? 'เงินสด' : 'โอน / สแกนจ่าย') : '') +
       (o.note ? infoRow('ข้อความถึงร้าน', esc(o.note)) : '') +
       '</dl></div>';
-  }
-
-  function timeline(o) {
-    const cod = o.payMethod === 'cod';
-    const pickup = o.deliveryMethod === 'pickup';
-    const doneCount = { new: 1, quoted: 2, confirmed: cod ? 3 : 2, slip: 2, paid: 3, shipping: 4, done: 5 }[o.status] || 0;
-    const steps = [
-      { t: 'สั่งข้าว', d: o.createdAt },
-      { t: 'ร้านแจ้งราคา', d: o.quotedAt },
-      { t: cod ? 'ยืนยันสั่งข้าว (จ่ายเงินสด)' : 'จ่ายเงิน', d: cod ? o.confirmedAt : o.paidAt },
-      { t: pickup ? 'ข้าวพร้อมให้มารับ' : 'ร้านนำข้าวไปส่ง', d: o.shippedAt },
-      { t: 'ได้รับข้าว', d: o.doneAt },
-    ];
-    return '<ol class="timeline">' + steps.map((s, i) => {
-      const cls = i < doneCount ? 'done' : i === doneCount ? 'now' : '';
-      return '<li class="' + cls + '"' + (cls === 'now' ? ' aria-current="step"' : '') + '><span class="dot">' + (cls === 'done' ? icon('check') : i + 1) + '</span>' +
-        '<span class="tl-text"><strong>' + s.t + '</strong>' + (cls === 'done' && s.d ? '<span>' + R.dateTH(s.d, true) + '</span>' : '') + '</span></li>';
-    }).join('') + '</ol>';
   }
 
   function payPanel(o) {
@@ -1018,12 +999,12 @@
   }
 
   async function cancelOrder(id) {
-    const ok = await R.confirmBox('ยกเลิกการสั่งข้าวนี้ใช่ไหมคะ', 'ถ้ายกเลิกแล้ว ต้องสั่งใหม่อีกครั้ง', 'ใช่ ยกเลิก', 'ไม่ยกเลิก', 'danger');
+    const ok = await R.confirmBox('ยกเลิกคำสั่งซื้อนี้ใช่ไหมคะ', 'ถ้ายกเลิกแล้ว ต้องสั่งใหม่อีกครั้ง', 'ใช่ ยกเลิก', 'ไม่ยกเลิก', 'danger');
     if (!ok) return;
     R.busy(true, 'กำลังยกเลิก...');
     try {
       upsertOrder(await R.api('cancelOrder', { orderId: id }));
-      R.toast('ยกเลิกการสั่งข้าวแล้ว', 'ok');
+      R.toast('ยกเลิกคำสั่งซื้อแล้ว', 'ok');
       render();
     } catch (e) { R.toast(e.message, 'err'); } finally { R.busy(false); }
   }

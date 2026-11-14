@@ -23,7 +23,7 @@
     const pickup = o.deliveryMethod === 'pickup';
     const cod = o.payMethod === 'cod';
     switch (o.status) {
-      case 'new': return { label: 'รอร้านแจ้งราคา', tone: 'gold', icon: 'clock', next: 'ร้านกำลังคิดราคา แล้วจะส่งมาทาง LINE' };
+      case 'new': return { label: 'รอร้านแจ้งราคา', tone: 'gold', icon: 'clock', next: 'ร้านกำลังสรุปยอด และจะแจ้งทาง LINE' };
       case 'quoted': return { label: 'ร้านแจ้งราคาแล้ว', tone: 'blue', icon: 'receipt', next: 'ดูราคา แล้วกดยืนยัน', action: true };
       case 'confirmed':
         return cod
