@@ -126,7 +126,7 @@
     }).join('');
     const z = A.zort || {};
     const last = z.lastSync;
-    const activeProducts = A.products.filter((p) => p.active && !(p.stock !== null && p.stock !== undefined && p.stock <= 0)).length;
+    const activeProducts = A.products.length;
     const who = (A.admin && A.admin.name) || 'แอดมิน';
     return '<div class="side-brand"><img src="assets/logo-96.png" alt=""><div><b>' + esc(shopName()) + '</b><span>ระบบหลังร้าน</span></div>' +
       '<button type="button" class="side-x" data-act="nav-close" aria-label="ปิดเมนู">' + icon('x') + '</button></div>' +
@@ -289,9 +289,9 @@
         '<span class="p-size">' + (p.sizeKg ? p.sizeKg + ' กก.' : '-') + ' / ' + esc(p.unit) + '</span>' +
         '<span class="p-price"><b>฿' + money(p.price) + '</b>' + (p.priceWholesale ? '<small>ส่ง ฿' + money(p.priceWholesale) + '</small>' : '') + '</span>' +
         '<span class="p-stock">' + stock + '</span>' +
-        '<span class="p-st">' + (!p.active ? '<span class="pill tone-done">ซ่อน</span>'
-          : p.stock !== null && p.stock !== undefined && p.stock <= 0 ? '<span class="pill tone-done" title="ลูกค้าจะเห็นอีกครั้งเมื่อสต็อกใน ZORT มีของ">ไม่แสดง (หมด)</span>'
-          : '<span class="pill tone-green">ขายอยู่</span>') + '</span>' +
+        '<span class="p-st">' + (!p.active ? '<span class="pill tone-done" title="ปิดขายใน ZORT — ลูกค้าไม่เห็น">ปิดขาย</span>'
+          : p.stock !== null && p.stock !== undefined && p.stock <= 0 ? '<span class="pill tone-red" title="ลูกค้าจะเห็นอีกครั้งเมื่อสต็อกใน ZORT มีของ">สินค้าหมด</span>'
+          : '<span class="pill tone-green">เปิดขาย</span>') + '</span>' +
         '</div>';
     }).join('');
   }
@@ -299,10 +299,15 @@
   function productsView() {
     const z = A.zort || {};
     const noImg = A.products.filter((p) => !p.image).length;
+    const oos = (p) => p.stock !== null && p.stock !== undefined && p.stock <= 0;
+    const nOn = A.products.filter((p) => p.active && !oos(p)).length;
+    const nOut = A.products.filter((p) => p.active && oos(p)).length;
+    const nOff = A.products.filter((p) => !p.active).length;
     return '<div class="toolbar">' +
       '<div class="search grow">' + icon('search') + '<input type="search" id="pq" placeholder="ค้นหาชื่อข้าว SKU หมวด ขนาด" value="' + esc(A.pq) + '" aria-label="ค้นหาสินค้า"></div>' +
       (!R.DEMO ? '<button type="button" class="btn btn-primary btn-sm" data-act="zort">' + icon('refresh') + ' ดึงสินค้าจาก ZORT</button>' : '') +
       '</div>' +
+      '<p class="hint-line">' + icon('rice') + 'ทั้งหมด <b>' + A.products.length + '</b> รายการ · เปิดขาย <b>' + nOn + '</b> (ลูกค้าเห็น) · สินค้าหมด <b>' + nOut + '</b> · ปิดขาย <b>' + nOff + '</b></p>' +
       (noImg ? '<p class="hint-line">' + icon('image') + 'ยังไม่มีรูป ' + noImg + ' รายการ — ใส่รูปที่สินค้าในระบบ ZORT แล้วกด "ดึงสินค้าจาก ZORT"</p>' : '') +
       '<div class="panel p-table"><div class="p-head"><span></span><span>สินค้า</span><span>ขนาด</span><span>ราคาปลีก / ส่ง</span><span>สต็อก</span><span>สถานะ</span></div>' +
       '<div id="prows">' + productRows() + '</div></div>' +
@@ -810,30 +815,27 @@
     return l ? 'ซิงก์ล่าสุด ' + new Date(l.at).toLocaleString('th-TH') + ' — ' + l.fetched + ' รายการ' : 'ยังไม่เคยซิงก์';
   }
 
-  /** รายงานผลการดึงสินค้า: มาจาก ZORT กี่รายการ ถูกข้ามเพราะอะไร สต็อกหมดกี่รายการ รูปจาก ZORT */
+  /** รายงานผลการดึงสินค้า: ZORT แจ้งกี่รายการ ได้รับกี่รายการ เปิดขาย/ปิดขาย/หมด กี่รายการ */
   function zortReport(r) {
     const d = r.diag || {};
     const im = r.images || {};
     const kv = (k, v, tone) => '<tr><th style="text-align:left;font-weight:500;padding:4px 10px 4px 0">' + k + '</th><td style="text-align:right;padding:4px 0"><b' + (tone ? ' style="color:' + tone + '"' : '') + '>' + v + '</b></td></tr>';
-    const skipped = (d.skipped || []).map((x) => '<li style="margin:3px 0"><b>' + esc(x.name) + '</b> <span class="muted">— ' + esc(x.why) + '</span></li>').join('');
-    const oos = (r.outOfStock || []).map((n) => '<li style="margin:3px 0">' + esc(n) + '</li>').join('');
-    const lost = (d.notMatched || 0) + (d.service || 0) + (d.inactive || 0);
+    const ul = (arr) => '<ul style="padding-left:18px;max-height:30vh;overflow:auto">' + arr.map((n) => '<li style="margin:3px 0">' + esc(n) + '</li>').join('') + '</ul>';
+    const oos = r.outOfStock || [];
+    const closed = d.closedList || [];
+    const sell = (d.active || 0) - oos.length;
     R.modal({
       title: 'ดึงสินค้าจาก ZORT เสร็จ',
-      html: '<p class="muted">ตัวกรอง: ' + esc(d.filter || '-') + ' · คลัง: ' + esc(d.warehouse || '-') + (d.zortCount ? ' · ZORT แจ้งว่ามี ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า)' : '') + '</p>' +
+      html: '<p class="muted">ดึงสินค้าทั้งร้าน · คลัง: ' + esc(d.warehouse || '-') + (d.zortCount ? ' · ZORT แจ้งว่ามี ' + d.zortCount + ' รายการ' : '') + '</p>' +
         '<table style="width:100%;border-collapse:collapse;margin:.4rem 0 .8rem">' +
-        kv('ได้รับจาก ZORT', (d.raw != null ? d.raw : r.fetched) + ' รายการ') +
-        (d.notMatched ? kv('ข้าม — ไม่ตรงคำค้น', d.notMatched, '#b54708') : '') +
-        (d.service ? kv('ข้าม — สินค้าบริการ', d.service, '#b54708') : '') +
-        (d.inactive ? kv('ข้าม — ปิดใช้งานใน ZORT', d.inactive, '#b54708') : '') +
-        (d.dup ? kv('รายการซ้ำ (นับครั้งเดียว)', d.dup) : '') +
-        kv('ดึงเข้าระบบ', r.fetched + ' รายการ (ใหม่ ' + r.added + ')', '#067647') +
-        ((r.outOfStock || []).length ? kv('สต็อกหมด — ไม่แสดงหน้าลูกค้า', r.outOfStock.length, '#b42318') : '') +
+        kv('สินค้าทั้งหมดที่ดึงมา', r.fetched + ' รายการ (ใหม่ ' + r.added + ')') +
+        kv('เปิดขาย และมีสต็อก — ลูกค้าเห็น', Math.max(0, sell) + ' รายการ', '#067647') +
+        (oos.length ? kv('เปิดขาย แต่สินค้าหมด', oos.length + ' รายการ', '#b42318') : '') +
+        (d.closed ? kv('ปิดขายใน ZORT', d.closed + ' รายการ', '#667085') : '') +
         kv('รูปจาก ZORT', (im.zort || 0) + ' มีรูป · ' + (im.none || 0) + ' ไม่มีรูป') +
         '</table>' +
-        (lost && skipped ? '<details' + (lost <= 20 ? ' open' : '') + '><summary><b>สินค้าที่ถูกข้าม</b>' + (lost > (d.skipped || []).length ? ' (แสดง ' + d.skipped.length + ' จาก ' + lost + ')' : '') + '</summary><ul style="padding-left:18px;max-height:30vh;overflow:auto">' + skipped + '</ul></details>' : '') +
-        (oos ? '<details><summary><b>สินค้าที่สต็อกหมด</b> (ลูกค้าจะเห็นเมื่อ ZORT มีของ)</summary><ul style="padding-left:18px;max-height:30vh;overflow:auto">' + oos + '</ul></details>' : '') +
-        (d.notMatched ? '<p class="muted" style="margin-top:.6rem">ถ้าสินค้าที่ไม่ตรงคำค้นเป็นข้าวด้วย แก้ <code>ZORT_KEYWORD</code> ในแท็บ Settings (คั่นหลายคำด้วย ,) หรือล้างค่าเพื่อดึงทั้งร้าน</p>' : '') +
+        (oos.length ? '<details><summary><b>สินค้าหมด</b> (ลูกค้าจะเห็นเมื่อ ZORT มีของ)</summary>' + ul(oos) + '</details>' : '') +
+        (closed.length ? '<details><summary><b>สินค้าปิดขาย</b>' + (d.closed > closed.length ? ' (แสดง ' + closed.length + ' จาก ' + d.closed + ')' : '') + '</summary>' + ul(closed) + '</details>' : '') +
         (im.detailLeft ? '<p class="muted">ยังตรวจรูปไม่ครบ เหลือ ' + im.detailLeft + ' รายการ กดดึงอีกครั้งเพื่อตรวจต่อ</p>' : ''),
       actions: [{ label: 'ตกลง', value: 1, kind: 'primary' }],
     });

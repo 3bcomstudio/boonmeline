@@ -15,8 +15,7 @@
  *   ZORT_APISECRET   — API Secret
  *
  * แท็บ Settings (ปรับได้โดยไม่ต้องแก้โค้ด):
- *   ZORT_CATEGORY_IDS      — id หมวดสินค้าข้าวใน ZORT คั่นด้วย , (ดูได้จาก zortListCategories)
- *   ZORT_KEYWORD           — คำที่ต้องมีในชื่อ/หมวด/SKU เช่น ข้าว (คั่นหลายคำด้วย ,) ใช้เมื่อไม่ระบุหมวด
+ *   (ดึงสินค้าทั้งร้านทุกครั้ง ทั้งที่เปิดและปิดขาย — หลังร้านเห็นครบ หน้าลูกค้าขายเฉพาะที่เปิดขายและมีสต็อก)
  *   ZORT_WAREHOUSE_CODE    — รหัสคลัง ถ้าต้องการสต็อกเฉพาะคลัง (ว่าง = รวมทุกคลัง)
  *   (ข้าวที่สต็อก ZORT เหลือ 0 จะไม่แสดงในหน้าลูกค้าเสมอ — ดู getProducts_ ใน Db.gs)
  *
@@ -127,25 +126,11 @@ function zortList_(data) {
   return [];
 }
 
-/** ดึงได้ 0 รายการ → ตรวจว่าร้านมีสินค้าไหม ชื่อ/หมวดหน้าตาแบบไหน แล้วบอกวิธีแก้ */
+/** ดึงได้ 0 รายการ → บอกว่า ZORT ตอบอะไรมา */
 function zortDiagnose_() {
-  const s = getSettings_();
   const data = zortGet_('Product/GetProducts', { page: 1, limit: 20 });
-  const list = zortList_(data);
-  const total = Number(data.count) || list.length;
-  const filter = String(s.ZORT_CATEGORY_IDS || '').trim()
-    ? 'หมวด ZORT_CATEGORY_IDS = ' + s.ZORT_CATEGORY_IDS
-    : (String(s.ZORT_KEYWORD || '').trim() ? 'คำค้น ZORT_KEYWORD = "' + s.ZORT_KEYWORD + '"' : 'ไม่กรอง');
-  if (!list.length) {
-    return 'ZORT ตอบกลับสำเร็จแต่ไม่มีรายการสินค้าเลย (ช่องข้อมูลที่ได้: ' + Object.keys(data).join(', ') +
-      ') — ตรวจว่า storename ถูกร้าน และ API Key ผูกกับคลังที่มีสินค้า';
-  }
-  const cats = {};
-  list.forEach(function (p) { if (p.category) cats[p.category + ' (id ' + p.categoryid + ')'] = true; });
-  return 'ร้านมีสินค้าใน ZORT ' + total + ' รายการ แต่ใช้ ' + filter + ' แล้วไม่เจอ' +
-    ' | ตัวอย่างชื่อ: ' + list.slice(0, 4).map(function (p) { return p.name; }).join(', ') +
-    (Object.keys(cats).length ? ' | หมวดที่พบ: ' + Object.keys(cats).slice(0, 6).join(', ') : ' | สินค้ายังไม่ได้จัดหมวด') +
-    ' → แก้ ZORT_CATEGORY_IDS หรือ ZORT_KEYWORD ในแท็บ Settings (ล้างทั้งคู่ = ดึงทั้งร้าน)';
+  return 'ZORT ตอบกลับสำเร็จแต่ไม่มีรายการสินค้า (ช่องข้อมูลที่ได้: ' + Object.keys(data).join(', ') +
+    ') — ตรวจว่า storename ถูกร้าน และ API Key ผูกกับคลังที่มีสินค้า';
 }
 
 /** ดึงสินค้าทุกหน้าตามเงื่อนไข (คืน array ของ product object จาก ZORT) */
@@ -188,77 +173,60 @@ function zortGetProductDetail_(id) {
 }
 
 /**
- * ดึงเฉพาะสินค้าข้าว ตามที่ตั้งใน Settings
- *   - ถ้ามี ZORT_CATEGORY_IDS → ดึงทีละหมวด
- *   - ไม่งั้นถ้ามี ZORT_KEYWORD → ค้นด้วยคำค้น
- *   - ไม่ตั้งทั้งคู่ → ดึงสินค้าทั้งร้าน
+ * ดึงสินค้าทั้งร้านจาก ZORT — ทั้งที่เปิดขายและปิดขาย (ไม่กรองหมวด/คำค้น)
+ *   ขอ 2 รอบ: activestatus=1 (เปิด) และ activestatus=0 (ปิด) เผื่อ ZORT ส่งเฉพาะสินค้าที่เปิดเมื่อไม่ระบุ
+ *   สถานะเปิด/ปิด: ใช้ช่อง active ของสินค้าก่อน ถ้าไม่มีใช้ตามรอบที่ได้มา
  */
 function zortFetchRiceProducts_() {
   const s = getSettings_();
-  const base = {
-    activestatus: 1,                                       // เฉพาะสินค้าที่เปิดใช้งานใน ZORT
-    warehousecode: String(s.ZORT_WAREHOUSE_CODE || '').trim(),
-  };
-  const catIds = String(s.ZORT_CATEGORY_IDS || '').split(/[,\s]+/).filter(function (x) { return /^\d+$/.test(x); });
-  const keyword = String(s.ZORT_KEYWORD || '').trim();
+  const wh = String(s.ZORT_WAREHOUSE_CODE || '').trim();
   const info = {};
-  const diag = {
-    filter: catIds.length ? 'หมวด ' + catIds.join(', ') : keyword ? 'คำค้น "' + keyword + '"' : 'ทั้งร้าน',
-    warehouse: base.warehousecode || 'ทุกคลัง',
-    raw: 0, notMatched: 0, service: 0, inactive: 0, dup: 0, kept: 0,
-    skipped: [],                                           // ตัวอย่างสินค้าที่ถูกข้าม { name, why }
-  };
-  const skip = function (p, why) { if (diag.skipped.length < 60) diag.skipped.push({ name: String(p.name || '#' + p.id), why: why }); };
+  const diag = { warehouse: wh || 'ทุกคลัง', raw: 0, dup: 0, kept: 0, active: 0, closed: 0, service: 0, closedList: [] };
 
-  let list = [];
-  if (catIds.length) {
-    catIds.forEach(function (id) {
-      list = list.concat(zortGetAllProducts_(Object.assign({ categoryid: id }, base), info));
+  const byId = {}, order = [];
+  [1, 0].forEach(function (st) {
+    let list = [];
+    try { list = zortGetAllProducts_({ activestatus: st, warehousecode: wh }, info); } catch (err) {
+      if (st === 1) throw err;                              // รอบสินค้าปิดขาย error ได้ (บางร้าน ZORT ไม่รองรับ) — ใช้เท่าที่ได้
+      console.error('ดึงสินค้าที่ปิดขายไม่ได้: ' + err.message);
+    }
+    diag.raw += list.length;
+    list.forEach(function (p) {
+      if (!p || p.id === undefined) return;
+      if (byId[p.id]) { diag.dup++; return; }
+      byId[p.id] = { p: p, from: st };
+      order.push(p.id);
     });
-  } else if (keyword) {
-    // กรองคำค้นเองในชื่อ/หมวด/SKU แทนการส่ง keyword ให้ ZORT (ช่องค้นหาของ ZORT ค้นภาษาไทยไม่เจอในบางร้าน)
-    // คั่นหลายคำด้วย , เช่น "ข้าว, rice"
-    const words = keyword.split(',').map(function (w) { return w.trim().toLowerCase(); }).filter(String);
-    const all = zortGetAllProducts_(base, info);
-    diag.raw = all.length;
-    list = all.filter(function (p) {
-      const text = [p.name, p.category, p.sku].join(' ').toLowerCase();
-      const ok = words.some(function (w) { return text.indexOf(w) >= 0; });
-      if (!ok) { diag.notMatched++; skip(p, 'ไม่มีคำว่า ' + words.join(' / ') + ' ในชื่อ หมวด หรือ SKU'); }
-      return ok;
-    });
-  } else {
-    list = zortGetAllProducts_(base, info);
-  }
-  if (!diag.raw) diag.raw = list.length;
+  });
   diag.zortCount = info.count || 0;
   diag.pages = info.pages || 0;
 
-  const seen = {};
-  const out = list.filter(function (p) {
-    if (!p || p.id === undefined) return false;
-    if (seen[p.id]) { diag.dup++; return false; }
-    seen[p.id] = true;
-    if (Number(p.producttype) === 1) { diag.service++; skip(p, 'เป็นสินค้าประเภทบริการ'); return false; }
-    if (!zortIsActive_(p)) { diag.inactive++; skip(p, 'ปิดใช้งานใน ZORT'); return false; }
-    return true;
-  }).map(zortToProduct_);
+  const out = order.map(function (id) {
+    const x = byId[id];
+    const prod = zortToProduct_(x.p);
+    const flag = zortActiveFlag_(x.p);
+    prod.active = flag === null ? x.from === 1 : flag;
+    if (Number(x.p.producttype) === 1) { prod.active = false; diag.service++; }   // สินค้าบริการ ไม่ขายหน้าลูกค้า
+    if (prod.active) diag.active++;
+    else { diag.closed++; if (diag.closedList.length < 80) diag.closedList.push(prod.fullName); }
+    return prod;
+  });
   diag.kept = out.length;
-  out.inactive = diag.inactive;
+  out.inactive = diag.closed;
   out.diag = diag;
   return out;
 }
 
-/** สินค้าเปิดใช้งานใน ZORT หรือไม่ — รองรับค่า true/false, 1/0, "1"/"0", "true"/"false", "active"/"inactive" */
-function zortIsActive_(z) {
+/** สถานะเปิด/ปิดขายจากช่องของสินค้า — true/false หรือ null ถ้า ZORT ไม่ส่งมา */
+function zortActiveFlag_(z) {
   const keys = ['active', 'activestatus', 'isactive'];
   for (let i = 0; i < keys.length; i++) {
     const v = z[keys[i]];
     if (v === undefined || v === null || v === '') continue;
     if (typeof v === 'boolean') return v;
-    return !/^(0|false|no|n|inactive|disabled?|closed?|off|ปิด|ไม่ใช้งาน|ปิดใช้งาน)$/i.test(String(v).trim());
+    return !/^(0|false|no|n|inactive|disabled?|closed?|off|ปิด|ไม่ใช้งาน|ปิดใช้งาน|ปิดขาย)$/i.test(String(v).trim());
   }
-  return true;   // ZORT ไม่ส่งสถานะมา = ถือว่าเปิด (เพราะขอเฉพาะ activestatus=1 แล้ว)
+  return null;
 }
 
 /** แปลง product ของ ZORT เป็นรูปแบบเดียวกับแท็บ Products */
@@ -279,7 +247,7 @@ function zortToProduct_(z) {
     image: zortImageUrl_(z),
     fullName: fullName,
     category: clean_(z.category, 80),
-    active: true,                                           // ผ่านตัวกรองแล้ว = เปิดใช้งานเท่านั้น
+    active: true,                                           // ตั้งค่าจริงใน zortFetchRiceProducts_
   };
 }
 
@@ -354,7 +322,7 @@ function syncZortProducts(opts) {
   const result = withLock_(function () {
     const items = zortFetchRiceProducts_();
     if (!items.length) {
-      fail_('zort_empty', 'ดึงจาก ZORT ได้ 0 รายการ' + (items.inactive ? ' (ข้ามสินค้าที่ปิดใช้งาน ' + items.inactive + ' รายการ)' : '') + ' จึงยังไม่แก้แท็บ Products — ' + zortDiagnose_());
+      fail_('zort_empty', 'ดึงจาก ZORT ได้ 0 รายการ จึงยังไม่แก้แท็บ Products — ' + zortDiagnose_());
     }
 
     const ss = ss_();
@@ -408,7 +376,7 @@ function syncZortProducts(opts) {
       removed: removed + gone, inactive: items.inactive || 0, at: now.toISOString(),
       images: imgStat,
       diag: items.diag,
-      outOfStock: objs.filter(function (o) { return o.stock !== null && o.stock !== undefined && o.stock <= 0; }).map(function (o) { return o.name + (o.sizeKg ? ' ' + o.sizeKg + ' กก.' : ''); }),
+      outOfStock: objs.filter(function (o) { return o.active && o.stock !== null && o.stock !== undefined && o.stock <= 0; }).map(function (o) { return o.name + (o.sizeKg ? ' ' + o.sizeKg + ' กก.' : ''); }),
     };
     return result;
   });
@@ -610,13 +578,13 @@ function testZort() {
 
 function zortListCategories() {
   const list = zortGetCategories_();
-  console.log('หมวดสินค้าใน ZORT ' + list.length + ' หมวด — นำ id ไปใส่ ZORT_CATEGORY_IDS ในแท็บ Settings');
+  console.log('หมวดสินค้าใน ZORT ' + list.length + ' หมวด');
   list.forEach(function (c) { console.log('id ' + c.id + ' — ' + c.name); });
 }
 
 function zortPreview() {
   const items = zortFetchRiceProducts_();
-  console.log('จะดึงสินค้า ' + items.length + ' รายการ');
+  console.log('จะดึงสินค้า ' + items.length + ' รายการ (เปิดขาย ' + items.diag.active + ' · ปิดขาย ' + items.diag.closed + ')');
   items.forEach(function (p) {
     console.log('#' + p.zortId + ' | ' + p.sku + ' | ' + p.name + ' | ' + p.sizeKg + ' กก. | ฿' + p.price + ' | สต็อก ' + p.stock + ' ' + p.unit +
       ' | รูป: ' + (p.image ? 'มีใน ZORT' : 'ไม่มี — ใส่รูปที่สินค้าใน ZORT'));
@@ -627,10 +595,9 @@ function zortPreview() {
 function zortCheck() {
   const items = zortFetchRiceProducts_();
   const d = items.diag;
-  console.log('ตัวกรอง: ' + d.filter + ' | คลัง: ' + d.warehouse + ' | ZORT บอกว่ามี ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า)');
-  console.log('ได้จาก ZORT ' + d.raw + ' → ไม่ตรงคำค้น ' + d.notMatched + ' · บริการ ' + d.service + ' · ปิดใช้งาน ' + d.inactive + ' · ซ้ำ ' + d.dup + ' → ดึงเข้า ' + d.kept);
-  d.skipped.forEach(function (x) { console.log('ข้าม: ' + x.name + ' — ' + x.why); });
-  items.filter(function (p) { return p.stock !== null && p.stock <= 0; }).forEach(function (p) {
-    console.log('สต็อกหมด (ไม่แสดงหน้าลูกค้า): ' + p.name + ' ' + p.sizeKg + ' กก.');
+  console.log('คลัง: ' + d.warehouse + ' | ZORT แจ้ง ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า) | ได้รับ ' + d.raw + ' (ซ้ำ ' + d.dup + ') → สินค้า ' + d.kept);
+  console.log('เปิดขาย ' + d.active + ' · ปิดขาย ' + d.closed + (d.service ? ' (รวมสินค้าบริการ ' + d.service + ')' : ''));
+  items.forEach(function (p) {
+    console.log((p.active ? (p.stock !== null && p.stock <= 0 ? '[หมด]   ' : '[ขาย]   ') : '[ปิดขาย] ') + p.fullName + ' | สต็อก ' + (p.stock === null ? '-' : p.stock) + ' | รูป ' + (p.image ? 'มี' : 'ไม่มี'));
   });
 }
