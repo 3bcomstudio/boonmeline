@@ -78,7 +78,8 @@
     if (key !== lastKey) {
       window.scrollTo(0, 0);
       const h = document.querySelector('.page-title, .hello strong');
-      if (h && lastKey) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+      const touch = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+      if (h && lastKey && !touch) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
       lastKey = key;
       maybeRefresh(r);
     }
@@ -172,7 +173,7 @@
       body:
         helloCard(first) + alert +
         '<button type="button" class="order-cta" data-act="go" data-to="#/shop">' +
-        '<span class="badge-ic">' + icon('rice') + '</span>' +
+        '<span class="badge-ic">' + icon('cart') + '</span>' +
         '<span class="cta-text"><strong>สั่งซื้อข้าวสาร</strong></span></button>' +
         '<nav class="menu" aria-label="เมนู">' + reorder +
         menuItem({ act: 'go', to: '#/orders', icon: 'receipt', label: 'ประวัติการสั่ง', sub: active ? 'ยังไม่เสร็จ ' + active + ' รายการ' : 'ดูรายการที่เคยสั่งซื้อ และติดตามสถานะการจัดส่ง', badge: pending.length }) +
@@ -646,7 +647,7 @@
     const tiles = R.PURPOSES.map((p) => tile({ act: 'purpose', id: p.id, icon: p.icon, label: p.label, sub: p.hint, on: cart.purpose === p.id, wide: p.id === 'other' })).join('');
     return {
       back: '#/shop', top: 'สั่งซื้อข้าวสาร',
-      body: stepHead(2, 'ซื้อข้าวไปใช้ทำอะไร', 'เลือกประเภทการใช้งาน เพื่อให้ทางร้านประเมินราคาที่คุ้มค่าที่สุด') +
+      body: stepHead(2, 'กรุณาเลือกประเภทการใช้งาน', 'เพื่อให้ทางร้านประเมินราคาที่คุ้มค่าที่สุด') +
         '<div class="tiles">' + tiles + '</div><div id="purpose-note">' + purposeNoteField() + '</div>',
       bar: '<button type="button" class="btn btn-primary btn-lg btn-block" data-act="purpose-next"' + (cart.purpose ? '' : ' disabled') + '>ถัดไป ' + icon('chevron') + '</button>',
     };
@@ -750,9 +751,9 @@
         infoRow('วันที่ต้องการ', esc(wantText()), '#/delivery') +
         infoRow('ผู้สั่ง', esc(c.fullName) + '<br>' + esc(R.phoneFmt(c.phone)), '#/profile') +
         '</dl>' +
-        '<p class="bill-wait"><strong>ราคา:</strong> ร้านจะคิดราคารวมค่าส่ง แล้วส่งมาทาง LINE' + (S.settings.QUOTE_TIME ? ' ' + esc(S.settings.QUOTE_TIME) : '') + '</p>' +
+        '<p class="bill-wait"><strong>หมายเหตุ :</strong> ทางร้านจะสรุปยอดรวมค่าจัดส่ง และแจ้งรายละเอียดกลับทาง LINE (ในวันและเวลาทำการ)</p>' +
         '</div>' +
-        '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่จำเป็นต้องกรอก)</span>' +
+        '<label class="field"><span class="field-label">ฝากข้อความถึงร้าน (ไม่จำเป็นต้องระบุ)</span>' +
         '<textarea class="textarea" data-bind="note" rows="2" maxlength="500" placeholder="เช่น ส่งช่วงเช้า หรือ โทรก่อนมาส่ง">' + esc(cart.note) + '</textarea></label>',
       bar: '<button type="button" class="btn btn-go btn-lg btn-block" data-act="submit">' + icon('check') + ' ส่งใบสั่งซื้อให้ร้าน</button>',
     };
@@ -1112,7 +1113,7 @@
       case 'go': go(el.dataset.to); break;
       case 'shop-exit': {
         const n = cartLines().length;
-        if (n && !(await R.confirmBox('ออกจากหน้าสั่งซื้อ?', 'ข้าวที่เลือกไว้ ' + n + ' รายการ จะถูกล้าง', 'ออกและล้างรายการ', 'เลือกข้าวต่อ'))) break;
+        if (n && !(await R.confirmBox('ออกจากหน้าสั่งซื้อ?', 'ข้าวที่เลือกไว้ ' + n + ' รายการ จะถูกยกเลิก', 'ออกและไม่บันทึกรายการ', 'ดำเนินการต่อ'))) break;
         go('#/');
         break;
       }

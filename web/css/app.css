@@ -226,7 +226,14 @@ html[data-size="xl"] { font-size: 23px; }
 .how li b { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; border: 2px solid var(--gold); color: var(--gold-700); background: var(--gold-100); }
 
 /* ---------- รายการข้าว ---------- */
-.prod-list { background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line-soft); }
+.prod-list { background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line-soft); margin-inline: -.6rem; }
+@media (max-width: 600px) {
+  /* มือถือ: รายการข้าวเต็มความกว้างจอ */
+  .prod-list { margin-inline: -1rem; border-radius: 0; border-inline: 0; }
+  .prod { padding-inline: .8rem 1rem; }
+}
+/* หัวข้อที่รับโฟกัสจากการเปลี่ยนหน้า ไม่ต้องแสดงกรอบ */
+.page-title[tabindex="-1"]:focus, .hello strong[tabindex="-1"]:focus { outline: none; }
 .prod {
   display: grid; grid-template-columns: 5.2rem 1fr; gap: .4rem .9rem;
   padding: 1rem; border-bottom: 1px solid var(--line-soft);
