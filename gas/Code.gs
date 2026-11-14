@@ -124,7 +124,7 @@ function verifyUser_(idToken) {
   const hit = cache.get(key);
   if (hit) return JSON.parse(hit);
 
-  const channelId = prop_('LOGIN_CHANNEL_ID');
+  const channelId = loginChannelFor_(idToken);
   if (!channelId) fail_('config', 'ยังไม่ได้ตั้งค่า LOGIN_CHANNEL_ID ใน Script Properties');
   const res = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', {
     method: 'post',
@@ -139,6 +139,26 @@ function verifyUser_(idToken) {
   const ttl = Math.max(60, Math.min(1800, (Number(data.exp) || 0) - Math.floor(Date.now() / 1000) - 30));
   cache.put(key, JSON.stringify(user), ttl);
   return user;
+}
+
+/**
+ * channel ที่ใช้ตรวจ token — รับเฉพาะ channel ของร้านเอง: LOGIN_CHANNEL_ID และ channel เจ้าของ LIFF_ID / ADMIN_URL
+ * (LIFF ID ขึ้นต้นด้วย Channel ID เช่น 2012301609-xxxx) กันเปิดไม่ได้เมื่อเปลี่ยน LOGIN_CHANNEL_ID แต่ยังใช้ LIFF เดิม
+ */
+function loginChannelFor_(idToken) {
+  const ids = [prop_('LOGIN_CHANNEL_ID')];
+  [prop_('LIFF_ID'), prop_('ADMIN_URL')].forEach(function (v) {
+    const m = String(v || '').match(/(\d{8,})-[A-Za-z0-9]+/);
+    if (m) ids.push(m[1]);
+  });
+  const allowed = ids.map(function (x) { return String(x || '').trim(); }).filter(String);
+  let aud = '';
+  try {
+    const part = String(idToken).split('.')[1] || '';
+    const json = Utilities.newBlob(Utilities.base64DecodeWebSafe(part + '==='.slice((part.length + 3) % 4))).getDataAsString();
+    aud = String(JSON.parse(json).aud || '');
+  } catch (e) { /* อ่านไม่ได้ → ใช้ค่าแรก ให้ LINE ตรวจ */ }
+  return allowed.indexOf(aud) >= 0 ? aud : allowed[0];
 }
 
 function isAdmin_(userId) {

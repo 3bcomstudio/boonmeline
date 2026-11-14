@@ -324,7 +324,7 @@ function logWebhook_(type, result) {
 /** ตรวจการเชื่อม LINE: token เป็นของ OA ไหน, webhook URL ที่ตั้งไว้, เหตุการณ์ล่าสุด (ไม่มีความลับ) */
 function lineStatus_() {
   const token = prop_('LINE_CHANNEL_ACCESS_TOKEN');
-  const out = { tokenSet: !!token, webhookLog: parseJson_(prop_('WEBHOOK_LOG'), []), myUrl: ScriptApp.getService().getUrl() };
+  const out = { tokenSet: !!token, liffId: prop_('LIFF_ID') || '', loginChannelId: prop_('LOGIN_CHANNEL_ID') || '', adminUrl: prop_('ADMIN_URL') || '', webhookLog: parseJson_(prop_('WEBHOOK_LOG'), []), myUrl: ScriptApp.getService().getUrl() };
   if (!token) return out;
   const get = function (url) {
     const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
