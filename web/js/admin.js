@@ -832,6 +832,7 @@
         kv('เปิดขาย และมีสต็อก — ลูกค้าเห็น', Math.max(0, sell) + ' รายการ', '#067647') +
         (oos.length ? kv('เปิดขาย แต่สินค้าหมด', oos.length + ' รายการ', '#b42318') : '') +
         (d.closed ? kv('ปิดขายใน ZORT', d.closed + ' รายการ', '#667085') : '') +
+        (d.service ? kv('ในจำนวนนี้เป็นบริการ', d.service + ' รายการ') : '') +
         kv('รูปจาก ZORT', (im.zort || 0) + ' มีรูป · ' + (im.none || 0) + ' ไม่มีรูป') +
         '</table>' +
         (oos.length ? '<details><summary><b>สินค้าหมด</b> (ลูกค้าจะเห็นเมื่อ ZORT มีของ)</summary>' + ul(oos) + '</details>' : '') +

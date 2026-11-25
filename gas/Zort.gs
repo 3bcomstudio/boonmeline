@@ -206,7 +206,7 @@ function zortFetchRiceProducts_() {
     const prod = zortToProduct_(x.p);
     const flag = zortActiveFlag_(x.p);
     prod.active = flag === null ? x.from === 1 : flag;
-    if (Number(x.p.producttype) === 1) { prod.active = false; diag.service++; }   // สินค้าบริการ ไม่ขายหน้าลูกค้า
+    if (Number(x.p.producttype) === 1) { diag.service++; prod.stock = null; }      // บริการ: ขายได้ ไม่นับสต็อก (ไม่ซ่อนเพราะสต็อก 0)
     if (prod.active) diag.active++;
     else { diag.closed++; if (diag.closedList.length < 80) diag.closedList.push(prod.fullName); }
     return prod;
@@ -607,7 +607,7 @@ function zortCheck() {
   const items = zortFetchRiceProducts_();
   const d = items.diag;
   console.log('คลัง: ' + d.warehouse + ' | ZORT แจ้ง ' + d.zortCount + ' รายการ (' + d.pages + ' หน้า) | ได้รับ ' + d.raw + ' (ซ้ำ ' + d.dup + ') → สินค้า ' + d.kept);
-  console.log('เปิดขาย ' + d.active + ' · ปิดขาย ' + d.closed + (d.service ? ' (รวมสินค้าบริการ ' + d.service + ')' : ''));
+  console.log('เปิดขาย ' + d.active + ' · ปิดขาย ' + d.closed + (d.service ? ' · เป็นบริการ ' + d.service + ' รายการ' : ''));
   items.forEach(function (p) {
     console.log((p.active ? (p.stock !== null && p.stock <= 0 ? '[หมด]   ' : '[ขาย]   ') : '[ปิดขาย] ') + p.fullName + ' | สต็อก ' + (p.stock === null ? '-' : p.stock) + ' | รูป ' + (p.image ? 'มี' : 'ไม่มี'));
   });
