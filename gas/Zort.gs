@@ -247,8 +247,19 @@ function zortToProduct_(z) {
     image: zortImageUrl_(z),
     fullName: fullName,
     category: clean_(z.category, 80),
+    tags: zortTags_(z),
     active: true,                                           // ตั้งค่าจริงใน zortFetchRiceProducts_
   };
+}
+
+/** แท็กสินค้าใน ZORT (ใช้เป็นคำค้น เช่น ชื่อเรียก/คำสะกดผิด) → "ฉัตรม่วง, ฉัดม่วง" */
+function zortTags_(z) {
+  const v = z.tag !== undefined ? z.tag : z.tags;
+  const list = Array.isArray(v) ? v : (v === null || v === undefined ? [] : String(v).split(','));
+  const seen = {};
+  return list.map(function (t) { return String(t && typeof t === 'object' ? (t.name || t.tag || '') : t).trim(); })
+    .filter(function (t) { if (!t || seen[t]) return false; seen[t] = true; return true; })
+    .join(', ').slice(0, 500);
 }
 
 /** สต็อกพร้อมขาย — ZORT ไม่ส่งตัวเลขมา = null (ไม่ทราบ ยังแสดงขาย) */
@@ -357,7 +368,7 @@ function syncZortProducts(opts) {
         id: 'z' + z.zortId, name: z.name, detail: z.detail, category: z.category, sizeKg: z.sizeKg, unit: z.unit,
         price: z.price, priceWholesale: old ? old.priceWholesale : '', image: z.image, active: z.active,
         sort: old && num_(old.sort) ? num_(old.sort) : nextSort++,
-        sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now,
+        sku: z.sku, zortId: z.zortId, stock: z.stock, syncedAt: now, tags: z.tags,
       };
     }).sort(function (a, b) { return a.sort - b.sort; });
     const gone = Object.keys(keep).filter(function (k) {

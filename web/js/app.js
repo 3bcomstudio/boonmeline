@@ -319,7 +319,7 @@
       if (skip !== 'unit' && F.unit && fieldOf(p, 'unit') !== F.unit) return false;
       if (skip !== 'size' && F.size && fieldOf(p, 'size') !== F.size) return false;
       if (!words.length) return true;
-      const hay = [p.name, p.detail, p.category, p.unit, p.sku].join(' ').toLowerCase();
+      const hay = [p.name, p.detail, p.category, p.unit, p.sku, p.tags].join(' ').toLowerCase();   // ค้นจากแท็กใน ZORT ด้วย
       // ตัวเลขล้วน = ค้นตามน้ำหนัก เช่น "5" หรือ "5 กก." ได้เฉพาะข้าวถุงละ 5 กก.
       return words.every((w) => (/^\d+(\.\d+)?$/.test(w) ? Number(w) === Number(p.sizeKg) : hay.indexOf(w) >= 0));
     });

@@ -279,7 +279,7 @@
 
   function productRows() {
     const q = A.pq.trim().toLowerCase();
-    const rows = A.products.filter((p) => !q || [p.name, p.sku, p.category, p.unit, p.sizeKg + ' กก'].join(' ').toLowerCase().indexOf(q) >= 0);
+    const rows = A.products.filter((p) => !q || [p.name, p.sku, p.category, p.unit, p.sizeKg + ' กก', p.tags].join(' ').toLowerCase().indexOf(q) >= 0);
     if (!rows.length) return '<div class="o-empty">' + icon('rice') + '<b>' + (A.products.length ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้า — กด "ดึงสินค้าจาก ZORT"') + '</b></div>';
     return rows.map((p) => {
       const stock = p.stock === null || p.stock === undefined ? '<span class="muted">-</span>' : p.stock > 0 ? '<b>' + p.stock + '</b>' : '<span class="pill tone-red">หมด</span>';

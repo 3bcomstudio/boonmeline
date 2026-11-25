@@ -27,7 +27,7 @@ const SCHEMA = {
   ],
   Products: [
     'id', 'name', 'detail', 'sizeKg', 'unit', 'price', 'priceWholesale', 'image', 'active', 'sort',
-    'sku', 'zortId', 'stock', 'syncedAt', 'category',   // ← ซิงก์จาก ZORT (ดู Zort.gs)
+    'sku', 'zortId', 'stock', 'syncedAt', 'category', 'tags',   // ← ซิงก์จาก ZORT (ดู Zort.gs) — tags ใช้ค้นหา
   ],
   Settings: ['key', 'value', 'note'],
   Admins: ['userId', 'name', 'notify', 'addedAt'],
@@ -179,6 +179,7 @@ function getProducts_(activeOnly) {
         sku: String(p.sku || ''),
         zortId: String(p.zortId || ''),
         category: String(p.category || ''),
+        tags: String(p.tags || ''),
         stock: p.stock === '' || p.stock === undefined ? null : Number(p.stock) || 0,
       };
     }).sort(function (a, b) { return a.sort - b.sort; });
